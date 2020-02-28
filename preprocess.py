@@ -51,10 +51,10 @@ class HistoneDataset(Dataset):
             self.y.append(torch.tensor(y))
 
         # width corresponds to columns
-        self.width = self.x[0].size()[1].item()
+        self.width = self.x[0].size()[1]
 
         # height corresponds to rows
-        self.heigth = self.x[0].size()[0].item()
+        self.height = self.x[0].size()[0]
 
     def __len__(self):
         """

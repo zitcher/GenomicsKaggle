@@ -13,6 +13,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def train(model, train_loader, hyperparams):
+    print("starting train")
+
     loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
     optimizer = optim.Adam(model.parameters(), hyperparams['learning_rate'])
 
@@ -36,6 +38,7 @@ def train(model, train_loader, hyperparams):
 
 
 def test(model, test_loader, hyperparams):
+    print("starting test")
     loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
 
     model = model.eval()
@@ -63,9 +66,8 @@ if __name__ == "__main__":
                         help="load model.pt")
     parser.add_argument("-s", "--save", action="store_true",
                         help="save model.pt")
-    parser.add_argument("-T", "--train", action="store_true", nargs="1",
-                        help="run training loop")
-    parser.add_argument("-t", "--test", action="store_true", nargs="1")
+    parser.add_argument("-T", "--train", nargs=1, help="train model")
+    parser.add_argument("-t", "--test", nargs=1, help="test model")
     args = parser.parse_args()
 
     hyperparams = {
