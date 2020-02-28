@@ -65,9 +65,8 @@ if __name__ == "__main__":
                         help="save model.pt")
     parser.add_argument("-T", "--train", action="store_true", nargs="1",
                         help="run training loop")
-    parser.add_argument("-t", "--test", action="store_true", nargs="1",
+    parser.add_argument("-t", "--test", action="store_true", nargs="1")
     args = parser.parse_args()
-
 
     hyperparams = {
         "stride": (1, 1),
