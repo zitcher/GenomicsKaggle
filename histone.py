@@ -11,6 +11,7 @@ import pickle
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 def train(model, train_loader, hyperparams):
     loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
     optimizer = optim.Adam(model.parameters(), hyperparams['learning_rate'])
@@ -24,11 +25,36 @@ def train(model, train_loader, hyperparams):
             y = y.to(device)
 
             optimizer.zero_grad()
-            y_pred = model(encoder_inputs, decoder_inputs, encoder_lengths, decoder_lengths)
+            y_pred = model(x)
+
+            loss = loss_fn(y_pred, y)
+
+            loss.backward()  # calculate gradients
+            optimizer.step()  # update model weights
+
+            print("loss:", loss.item())
 
 
 def test(model, test_loader, hyperparams):
-    pass
+    loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
+
+    model = model.eval()
+    losses = []
+    for epoch in range(hyperparams['num_epochs']):
+        for batch in tqdm(test_loader):
+            x = batch['x']
+            y = batch['y']
+            x = x.to(device)
+            y = y.to(device)
+
+            y_pred = model(x)
+
+            loss = loss_fn(y_pred, y)
+
+            losses.append(loss.item())
+            print("loss:", loss.item())
+
+    print("mean loss:", np.mean(losses))
 
 
 if __name__ == "__main__":
@@ -40,9 +66,6 @@ if __name__ == "__main__":
     parser.add_argument("-T", "--train", action="store_true", nargs="1",
                         help="run training loop")
     parser.add_argument("-t", "--test", action="store_true", nargs="1",
-                        help="run testing loop")
-    parser.add_argument("-m", "--multilingual-tags", nargs="*", default=[None],
-                        help="target tags for translation")
     args = parser.parse_args()
 
 
