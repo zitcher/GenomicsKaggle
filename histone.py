@@ -12,7 +12,20 @@ import pickle
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train(model, train_loader, hyperparams):
-    pass
+    loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
+    optimizer = optim.Adam(model.parameters(), hyperparams['learning_rate'])
+
+    model = model.train()
+    for epoch in range(hyperparams['num_epochs']):
+        for batch in tqdm(train_loader):
+            x = batch['x']
+            y = batch['y']
+            x = x.to(device)
+            y = y.to(device)
+
+            optimizer.zero_grad()
+            y_pred = model(encoder_inputs, decoder_inputs, encoder_lengths, decoder_lengths)
+
 
 def test(model, test_loader, hyperparams):
     pass
@@ -40,7 +53,7 @@ if __name__ == "__main__":
         "groups": 1,
         "num_kernels": 3,
         "kernel_size": (4, 20),
-        "output_size": 2,
+        "output_size": 1,
         "pool_size": (4, 4),
         "num_epochs": 1,
         "batch_size": 50,

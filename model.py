@@ -10,11 +10,11 @@ class CNN(nn.Module):
         width,
         height,
         stride=(1, 1),
-        padding=(0, 0),
+        padding=(0, 2),
         dilation=(1, 1),
         groups=1,
         num_kernels=3,
-        kernel_size=(4, 20),
+        kernel_size=(4, 4),
         output_size=2,
         pool_size=(4, 4)
     ):
