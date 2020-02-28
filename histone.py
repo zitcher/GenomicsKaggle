@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import argparse
 from tqdm import tqdm  # optional progress bar
-import pickle
+import pandas as pd
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -23,6 +23,7 @@ def train(model, train_loader, hyperparams):
         for batch in tqdm(train_loader):
             x = batch['x']
             y = batch['y']
+            x = x.unsqueeze(1)
             x = x.to(device)
             y = y.to(device)
 
@@ -43,23 +44,33 @@ def test(model, test_loader, hyperparams):
 
     model = model.eval()
     losses = []
-    for epoch in range(hyperparams['num_epochs']):
-        for batch in tqdm(test_loader):
-            x = batch['x']
-            y = batch['y']
-            x = x.to(device)
-            y = y.to(device)
+    classification = []
 
-            y_pred = model(x)
+    for batch in tqdm(test_loader):
+        x = batch['x']
+        y = batch['y']
+        cell_type = batch['cell_type']
+        id = batch['id']
+        x = x.unsqueeze(1)
+        x = x.to(device)
+        y = y.to(device)
 
-            loss = loss_fn(y_pred, y)
+        y_pred = model(x)
+        print(x, y, y_pred)
 
-            losses.append(loss.item())
-            print("loss:", loss.item())
+        classification.append((cell_type + "_" + id, y_pred))
+
+        loss = loss_fn(y_pred, y)
+
+        losses.append(loss.item())
+        print("loss:", loss.item())
 
     print("mean loss:", np.mean(losses))
+    df = pd.DataFrame(classification, columns=['id', 'expression'])
+    df.to_csv('submission.csv')
 
-
+# python histone.py -s -S ./data -T data/train.npz -t data/eval.npz
+# python histone.py -s -L ./data -T data/train.npz -t data/eval.npz
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--load", action="store_true",
@@ -68,17 +79,19 @@ if __name__ == "__main__":
                         help="save model.pt")
     parser.add_argument("-T", "--train", nargs=1, help="train model")
     parser.add_argument("-t", "--test", nargs=1, help="test model")
+    parser.add_argument("-S", "--savedata", nargs=1, help="save data")
+    parser.add_argument("-L", "--loaddata", nargs=1, help="load data")
     args = parser.parse_args()
 
     hyperparams = {
         "stride": (1, 1),
-        "padding": (0, 0),
+        "padding": (0, 2),
         "dilation": (1, 1),
         "groups": 1,
         "num_kernels": 3,
-        "kernel_size": (4, 20),
+        "kernel_size": (5, 5),
         "output_size": 1,
-        "pool_size": (4, 4),
+        "pool_size": (5, 5),
         "num_epochs": 1,
         "batch_size": 50,
         "learning_rate": 0.001
@@ -89,11 +102,13 @@ if __name__ == "__main__":
     test_dataset = None
     if args.train:
         train_file = args.train[0]
-        train_dataset = HistoneDataset(train_file)
+        train_dataset = HistoneDataset(train_file, args.savedata, args.loaddata, "train")
+
         model = CNN(
             channels=1,
             width=train_dataset.width,
             height=train_dataset.height,
+            batch_size=hyperparams["batch_size"],
             stride=hyperparams["stride"],
             padding=hyperparams["padding"],
             dilation=hyperparams["dilation"],
@@ -106,12 +121,15 @@ if __name__ == "__main__":
 
     if args.test:
         test_file = args.test[0]
-        test_dataset = HistoneDataset(test_file)
+
+        test_dataset = HistoneDataset(test_file, args.savedata, args.loaddata, "eval")
+
         if model is None:
             model = CNN(
                 channels=1,
                 width=train_dataset.width,
                 height=train_dataset.height,
+                batch_size=hyperparams["batch_size"],
                 stride=hyperparams["stride"],
                 padding=hyperparams["padding"],
                 dilation=hyperparams["dilation"],
@@ -122,6 +140,7 @@ if __name__ == "__main__":
                 pool_size=hyperparams["pool_size"]
             ).to(device)
 
+    train_loader = None
     if args.train:
         train_loader = DataLoader(
             train_dataset, batch_size=hyperparams['batch_size'], shuffle=True

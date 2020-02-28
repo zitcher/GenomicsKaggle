@@ -9,6 +9,7 @@ class CNN(nn.Module):
         channels,
         width,
         height,
+        batch_size,
         stride=(1, 1),
         padding=(0, 2),
         dilation=(1, 1),
@@ -16,13 +17,13 @@ class CNN(nn.Module):
         num_kernels=3,
         kernel_size=(4, 4),
         output_size=2,
-        pool_size=(4, 4)
+        pool_size=(4, 4),
     ):
         """
-            CNN model
+            Simple CNN model to test data pipeline
         """
         super().__init__()
-        # TODO: initialize the hyperparameters
+        self.batch_size = batch_size
         self.channels = channels
         self.output_size = output_size
         self.channels = channels
@@ -83,13 +84,14 @@ class CNN(nn.Module):
         return tuple(out)
 
     def forward(self, input):
-        # TODO: write forward propagation
+        # print("input", input.size())
+
         cout = self.conv(input)
-        # print(cout.size())
+        # print("cout", cout.size())
 
         pout = self.pool(F.relu(cout))
-        # print(pout.size())
+        # print("pout", pout.size())
 
-        out = self.fc(torch.flatten(pout))
+        out = self.fc(pout.view(self.batch_size, -1))
 
         return out
