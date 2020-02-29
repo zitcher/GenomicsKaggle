@@ -1,6 +1,6 @@
 from preprocess import HistoneDataset
 from model import CNN
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torch import nn, optim
 from torch.nn import functional as F
 import torch
@@ -38,39 +38,52 @@ def train(model, train_loader, hyperparams):
             print("loss:", loss.item())
 
 
-def test(model, test_loader, hyperparams):
-    print("starting test")
+def validate(model, validate_loader, hyperparams):
+    print("starting validation")
     loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
 
     model = model.eval()
     losses = []
-    classification = []
 
-    for batch in tqdm(test_loader):
+    for batch in tqdm(validate_loader):
         x = batch['x']
         y = batch['y']
-        cell_type = batch['cell_type']
-        id = batch['id']
         x = x.unsqueeze(1)
         x = x.to(device)
         y = y.to(device)
 
         y_pred = model(x)
-        print(x, y, y_pred)
-
-        classification.append((cell_type + "_" + id, y_pred))
 
         loss = loss_fn(y_pred, y)
 
         losses.append(loss.item())
-        print("loss:", loss.item())
 
     print("mean loss:", np.mean(losses))
+
+
+def test(model, test_loader, hyperparams):
+    print("starting test")
+    model = model.eval()
+    classification = []
+
+    for batch in tqdm(test_loader):
+        x = batch['x']
+        cell_type = batch['cell_type']
+        id = batch['id']
+        x = x.unsqueeze(1)
+        x = x.to(device)
+
+        y_pred = model(x)
+        for i in range(y_pred.size()[0]):
+            # print(cell_type[i].item(), id[i].item(), y_pred[i].item())
+            classification.append((cell_type[i].item() + "_" + str(int(id[i].item())), str(y_pred[i].item())))
+
     df = pd.DataFrame(classification, columns=['id', 'expression'])
-    df.to_csv('submission.csv')
+    df.to_csv('submission.csv', index=False)
 
 # python histone.py -s -S ./data -T data/train.npz -t data/eval.npz
 # python histone.py -s -L ./data -T data/train.npz -t data/eval.npz
+# python histone.py -lL ./data -t data/eval.npz
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--load", action="store_true",
@@ -99,15 +112,19 @@ if __name__ == "__main__":
 
     model = None
     train_dataset = None
+    validate_dataset = None
     test_dataset = None
+
     if args.train:
         train_file = args.train[0]
-        train_dataset = HistoneDataset(train_file, args.savedata, args.loaddata, "train")
+        dataset = HistoneDataset(train_file, args.savedata, args.loaddata, "train")
+
+        split_amount = int(len(dataset) * 0.9)
 
         model = CNN(
             channels=1,
-            width=train_dataset.width,
-            height=train_dataset.height,
+            width=dataset.width,
+            height=dataset.height,
             batch_size=hyperparams["batch_size"],
             stride=hyperparams["stride"],
             padding=hyperparams["padding"],
@@ -119,6 +136,9 @@ if __name__ == "__main__":
             pool_size=hyperparams["pool_size"]
         ).to(device)
 
+        train_dataset, validate_dataset = random_split(
+            dataset, (split_amount, len(dataset) - split_amount))
+
     if args.test:
         test_file = args.test[0]
 
@@ -127,8 +147,8 @@ if __name__ == "__main__":
         if model is None:
             model = CNN(
                 channels=1,
-                width=train_dataset.width,
-                height=train_dataset.height,
+                width=test_dataset.width,
+                height=test_dataset.height,
                 batch_size=hyperparams["batch_size"],
                 stride=hyperparams["stride"],
                 padding=hyperparams["padding"],
@@ -145,6 +165,9 @@ if __name__ == "__main__":
         train_loader = DataLoader(
             train_dataset, batch_size=hyperparams['batch_size'], shuffle=True
         )
+        validate_loader = DataLoader(
+            validate_dataset, batch_size=hyperparams['batch_size'], shuffle=True
+        )
 
     test_loader = None
     if args.test:
@@ -156,6 +179,7 @@ if __name__ == "__main__":
     if args.train:
         print("running training loop...")
         train(model, train_loader, hyperparams)
+        validate(model, validate_loader, hyperparams)
     if args.test:
         print("running testing loop...")
         test(model, test_loader, hyperparams)

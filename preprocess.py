@@ -4,7 +4,6 @@ import pprint
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-import pickle
 
 
 class HistoneDataset(Dataset):
@@ -13,7 +12,6 @@ class HistoneDataset(Dataset):
         :param input_file: the data file pathname
         """
         self.pp = pprint.PrettyPrinter(indent=4)
-        # TODO: read the input file line by line and put the lines in a list.
         npzfile = np.load(input_file)
 
         # [50, 16000, 100, 7]
@@ -83,12 +81,8 @@ class HistoneDataset(Dataset):
         # print('width', self.width)
         # print('height', self.height)
         #
-        # pp.pprint(npzfile[self.cell_types[0]][1])
-        # pp.pprint(self.x[1])
-        # print('id', self.id[1])
-        # print('id', self.type[1])
-        # print(len(self.type))
-        # print(len(self.id))
+        # self.pp.pprint(self.x[1])
+        # self.pp.pprint(self.y[1])
 
 
 

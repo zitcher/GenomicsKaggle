@@ -11,6 +11,7 @@ Deephistone: https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-019-5
 
 # Preprocess
 `python preprocess.py data/train.npz`
+`python preprocess.py data/eval.npz`
 
 # Train and Test
 `python histone.py -s -T data/train.npz -t data/eval.npz`

@@ -92,6 +92,6 @@ class CNN(nn.Module):
         pout = self.pool(F.relu(cout))
         # print("pout", pout.size())
 
-        out = self.fc(pout.view(self.batch_size, -1))
+        out = self.fc(pout.view(input.size()[0], -1))
 
         return out
