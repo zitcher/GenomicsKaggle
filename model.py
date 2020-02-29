@@ -10,14 +10,12 @@ class CNN(nn.Module):
         width,
         height,
         batch_size,
+        conv_structure,
         stride=(1, 1),
-        padding=(0, 2),
         dilation=(1, 1),
         groups=1,
         num_kernels=3,
-        kernel_size=(4, 4),
         output_size=2,
-        pool_size=(4, 4),
     ):
         """
             Simple CNN model to test data pipeline
@@ -30,42 +28,76 @@ class CNN(nn.Module):
         self.height = height
         self.width = width
         self.stride = stride
-        self.padding = padding
         self.dilation = dilation
         self.groups = groups
         self.num_kernels = num_kernels
-        self.kernel_size = kernel_size
+        self.conv_structure = conv_structure
 
-        self.conv = nn.Conv2d(
+
+        self.drop_layer = nn.Dropout(p=0.5)
+
+
+        self.conv1 = nn.Conv2d(
             in_channels=channels,
             out_channels=num_kernels,
-            kernel_size=kernel_size,
+            kernel_size=conv_structure[0][0],
+            padding=conv_structure[0][1],
             stride=stride,
-            padding=padding,
             dilation=dilation,
             groups=groups,
             padding_mode='zeros'
         )
 
-        self.pool = torch.nn.MaxPool2d(
-            kernel_size=pool_size,
-            padding=padding,
-            dilation=dilation,
-            stride=pool_size
+
+        self.pool1 = torch.nn.MaxPool2d(
+            kernel_size=conv_structure[1][0],
+            padding=conv_structure[1][1],
+            dilation=(dilation),
+            stride=conv_structure[1][2]
         )
 
+        self.norm1 = torch.nn.BatchNorm2d(num_kernels)
+
+        n_out_channels = num_kernels * num_kernels
+        self.conv2 = nn.Conv2d(
+            in_channels=num_kernels,
+            out_channels=n_out_channels,
+            kernel_size=conv_structure[2][0],
+            padding=conv_structure[2][1],
+            stride=stride,
+            dilation=dilation,
+            groups=groups,
+            padding_mode='zeros'
+        )
+
+
+        self.pool2 = torch.nn.MaxPool2d(
+            kernel_size=conv_structure[3][0],
+            padding=conv_structure[3][1],
+            dilation=dilation,
+            stride=conv_structure[3][2],
+        )
+
+        self.norm2 = torch.nn.BatchNorm2d(n_out_channels)
+
         # conv uout
-        cheight, cwidth = self.calc_out_conv2d(
-            (height, width), padding=padding, dilations=dilation, kernels=kernel_size, stride=stride)
-
+        c1height, c1width = self.calc_out_conv2d(
+            (height, width), padding=conv_structure[0][1], dilations=dilation, kernels=conv_structure[0][0], stride=stride)
+        print("height width", height, width)
         # pool out
-        pheight, pwidth = self.calc_out_pool2d(
-            (cheight, cwidth), padding=padding, dilations=dilation, kernels=pool_size, stride=pool_size)
+        p1height, p1width = self.calc_out_pool2d(
+            (c1height, c1width), padding=conv_structure[1][1], dilations=dilation, kernels=conv_structure[1][0], stride=conv_structure[1][2])
+        print("p1height p1width", p1height, p1width)
 
-        # print("height width", height, width)
-        # print("cheight cwidth", num_kernels, cheight, cwidth)
-        # print("pheight pwidth", num_kernels, pheight, pwidth)
-        self.fc = nn.Linear(num_kernels * pheight * pwidth, output_size)
+        c2height, c2width = self.calc_out_conv2d(
+            (p1height, p1width), padding=conv_structure[2][1], dilations=dilation, kernels=conv_structure[2][0], stride=stride)
+        print("c2height c2width", c2height, c2width)
+        # pool out
+        p2height, p2width = self.calc_out_pool2d(
+            (c2height, c2width), padding=conv_structure[3][1], dilations=dilation, kernels=conv_structure[3][0], stride=conv_structure[3][2])
+        print("n_out_channels p2height p2width", n_out_channels, p2height, p2width)
+        self.fc1 = nn.Linear(n_out_channels * p2height * p2width, n_out_channels * p2height * p2width // 2)
+        self.fc2 = nn.Linear(n_out_channels * p2height * p2width // 2, output_size)
 
     def calc_out_conv2d(self, dims, padding, dilations, kernels, stride):
         out = [0] * len(dims)
@@ -86,12 +118,16 @@ class CNN(nn.Module):
     def forward(self, input):
         # print("input", input.size())
 
-        cout = self.conv(input)
+        c1out = self.drop_layer(F.relu(self.norm1(self.conv1(input))))
         # print("cout", cout.size())
 
-        pout = self.pool(F.relu(cout))
+        p1out = self.pool1(c1out)
         # print("pout", pout.size())
 
-        out = self.fc(pout.view(input.size()[0], -1))
+        c2out = self.drop_layer(F.relu(self.norm2(self.conv2(p1out))))
+        p2out = self.pool2(c2out)
+
+        fc1out = self.drop_layer(F.relu(self.fc1(p2out.view(input.size()[0], -1))))
+        out = self.fc2(fc1out)
 
         return out

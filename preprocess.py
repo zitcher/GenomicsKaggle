@@ -75,7 +75,7 @@ class HistoneDataset(Dataset):
         # width corresponds to columns
         self.width = self.x[0].size()[1]
 
-        # height corresponds to rows
+        # height corresponds to rows - 100
         self.height = self.x[0].size()[0]
 
         # print('width', self.width)
