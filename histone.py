@@ -1,5 +1,5 @@
 from preprocess import HistoneDataset
-from model import CNN
+from model import Transformer
 from torch.utils.data import DataLoader, random_split
 from torch import nn, optim
 from torch.nn import functional as F
@@ -23,14 +23,14 @@ def train(model, train_loader, hyperparams):
         for batch in tqdm(train_loader):
             x = batch['x']
             y = batch['y']
-            x = x.unsqueeze(1)
+            # print("x", x.size())
             x = x.to(device)
             y = y.to(device)
 
             optimizer.zero_grad()
             y_pred = model(x)
 
-            loss = loss_fn(y_pred.squeeze(1), y)
+            loss = loss_fn(y_pred, y)
 
             loss.backward()  # calculate gradients
             optimizer.step()  # update model weights
@@ -48,13 +48,12 @@ def validate(model, validate_loader, hyperparams):
     for batch in tqdm(validate_loader):
         x = batch['x']
         y = batch['y']
-        x = x.unsqueeze(1)
         x = x.to(device)
         y = y.to(device)
 
         y_pred = model(x)
 
-        loss = loss_fn(y_pred.squeeze(1), y)
+        loss = loss_fn(y_pred.squeeze(2)[99], y)
 
         losses.append(loss.item())
 
@@ -70,7 +69,6 @@ def test(model, test_loader, hyperparams):
         x = batch['x']
         cell_type = batch['cell_type']
         id = batch['id']
-        x = x.unsqueeze(1)
         x = x.to(device)
 
         y_pred = model(x)
@@ -97,20 +95,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     hyperparams = {
-        "stride": (1, 1),
-        "dilation": (1, 1),
-        "groups": 1,
-        "num_kernels": 20,
-        "output_size": 1,
-        "num_epochs": 1,
         "batch_size": 50,
+        "nin": 5,
+        "ninp": 10,
+        "nhead": 5,
+        "nhid": 128,
+        "nlayers": 3,
         "learning_rate": 0.001,
-        "conv_structure": [
-            ((10, 2), (5, 1)),
-            ((3, 3), (1, 1), (3, 3)),
-            ((4, 2), (2, 1)),
-            ((3, 3), (1, 1), (3, 3)),
-        ]
+        "num_epochs": 2
     }
 
     model = None
@@ -124,17 +116,12 @@ if __name__ == "__main__":
 
         split_amount = int(len(dataset) * 0.9)
 
-        model = CNN(
-            channels=1,
-            width=dataset.width,
-            height=dataset.height,
-            batch_size=hyperparams["batch_size"],
-            stride=hyperparams["stride"],
-            dilation=hyperparams["dilation"],
-            groups=hyperparams["groups"],
-            num_kernels=hyperparams["num_kernels"],
-            output_size=hyperparams["output_size"],
-            conv_structure=hyperparams["conv_structure"]
+        model = Transformer(
+            nin=hyperparams["nin"],
+            ninp=hyperparams["ninp"],
+            nhead=hyperparams["nhead"],
+            nhid=hyperparams["nhid"],
+            nlayers=hyperparams["nlayers"]
         ).to(device)
 
         train_dataset, validate_dataset = random_split(
@@ -146,17 +133,12 @@ if __name__ == "__main__":
         test_dataset = HistoneDataset(test_file, args.savedata, args.loaddata, "eval")
 
         if model is None:
-            model = CNN(
-                channels=1,
-                width=test_dataset.width,
-                height=test_dataset.height,
-                batch_size=hyperparams["batch_size"],
-                stride=hyperparams["stride"],
-                dilation=hyperparams["dilation"],
-                groups=hyperparams["groups"],
-                num_kernels=hyperparams["num_kernels"],
-                output_size=hyperparams["output_size"],
-                conv_structure=hyperparams["conv_structure"]
+            model = Transformer(
+                nin=hyperparams["nin"],
+                ninp=hyperparams["ninp"],
+                nhead=hyperparams["nhead"],
+                nhid=hyperparams["nhid"],
+                nlayers=hyperparams["nlayers"]
             ).to(device)
 
     train_loader = None

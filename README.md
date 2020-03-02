@@ -15,3 +15,6 @@ Deephistone: https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-019-5
 
 # Train and Test
 `python histone.py -s -T data/train.npz -t data/eval.npz`
+`python histone.py -s -L ./data -T data/train.npz -t data/eval.npz`
+mv model.py DLGenomics
+mv histone.py DLGenomics
