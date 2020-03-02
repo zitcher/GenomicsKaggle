@@ -1,5 +1,5 @@
 from preprocess import HistoneDataset
-from model import Transformer
+from model import Linear
 from torch.utils.data import DataLoader, random_split
 from torch import nn, optim
 from torch.nn import functional as F
@@ -96,11 +96,6 @@ if __name__ == "__main__":
 
     hyperparams = {
         "batch_size": 50,
-        "nin": 5,
-        "ninp": 10,
-        "nhead": 5,
-        "nhid": 128,
-        "nlayers": 4,
         "learning_rate": 0.001,
         "num_epochs": 2
     }
@@ -116,13 +111,7 @@ if __name__ == "__main__":
 
         split_amount = int(len(dataset) * 0.9)
 
-        model = Transformer(
-            nin=hyperparams["nin"],
-            ninp=hyperparams["ninp"],
-            nhead=hyperparams["nhead"],
-            nhid=hyperparams["nhid"],
-            nlayers=hyperparams["nlayers"]
-        ).to(device)
+        model = Linear().to(device)
 
         train_dataset, validate_dataset = random_split(
             dataset, (split_amount, len(dataset) - split_amount))
@@ -133,13 +122,7 @@ if __name__ == "__main__":
         test_dataset = HistoneDataset(test_file, args.savedata, args.loaddata, "eval")
 
         if model is None:
-            model = Transformer(
-                nin=hyperparams["nin"],
-                ninp=hyperparams["ninp"],
-                nhead=hyperparams["nhead"],
-                nhid=hyperparams["nhid"],
-                nlayers=hyperparams["nlayers"]
-            ).to(device)
+            model = Linear().to(device)
 
     train_loader = None
     if args.train:
