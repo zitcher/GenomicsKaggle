@@ -53,7 +53,7 @@ def validate(model, validate_loader, hyperparams):
 
         y_pred = model(x)
 
-        loss = loss_fn(y_pred.squeeze(2)[99], y)
+        loss = loss_fn(y_pred, y)
 
         losses.append(loss.item())
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         "ninp": 10,
         "nhead": 5,
         "nhid": 128,
-        "nlayers": 3,
+        "nlayers": 4,
         "learning_rate": 0.001,
         "num_epochs": 2
     }
