@@ -82,6 +82,7 @@ def test(model, test_loader, hyperparams):
 # python histone.py -s -S ./data -T data/train.npz -t data/eval.npz
 # python histone.py -s -L ./data -T data/train.npz -t data/eval.npz
 # python histone.py -lL ./data -t data/eval.npz
+# /home/zachary_j_hoffman/DLGenomics/submission.csv
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--load", action="store_true",
@@ -97,7 +98,7 @@ if __name__ == "__main__":
     hyperparams = {
         "batch_size": 50,
         "learning_rate": 0.001,
-        "num_epochs": 2
+        "num_epochs": 1
     }
 
     model = None
