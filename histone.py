@@ -106,7 +106,7 @@ if __name__ == "__main__":
         train_file = args.train[0]
         dataset = HistoneDataset(train_file, args.savedata, args.loaddata, "train")
 
-        split_amount = int(len(dataset) * 0.8)
+        split_amount = int(len(dataset) * 0.95)
 
         train_dataset, validate_dataset = random_split(
             dataset, (split_amount, len(dataset) - split_amount))
@@ -117,6 +117,7 @@ if __name__ == "__main__":
         test_dataset = HistoneDataset(test_file, args.savedata, args.loaddata, "eval")
 
     train_loader = None
+    validate_loader = None
     if args.train:
         train_loader = DataLoader(
             train_dataset, batch_size=hyperparams['batch_size'], shuffle=True
