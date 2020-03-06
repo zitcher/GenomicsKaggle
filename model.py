@@ -1,133 +1,162 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from collections import OrderedDict
+from torch import Tensor
 
 
-class CNN(nn.Module):
-    def __init__(
-        self,
-        channels,
-        width,
-        height,
-        batch_size,
-        conv_structure,
-        stride=(1, 1),
-        dilation=(1, 1),
-        groups=1,
-        num_kernels=3,
-        output_size=2,
-    ):
-        """
-            Simple CNN model to test data pipeline
-        """
-        super().__init__()
-        self.batch_size = batch_size
-        self.channels = channels
-        self.output_size = output_size
-        self.channels = channels
-        self.height = height
-        self.width = width
-        self.stride = stride
-        self.dilation = dilation
-        self.groups = groups
-        self.num_kernels = num_kernels
-        self.conv_structure = conv_structure
+# Taken from https://pytorch.org/docs/stable/_modules/torchvision/models/densenet.html
+class _DenseLayer(nn.Module):
+    def __init__(self, num_input_features, growth_rate, bn_size, drop_rate):
+        super(_DenseLayer, self).__init__()
+        self.add_module('norm1', nn.BatchNorm2d(num_input_features)),
+        self.add_module('relu1', nn.ReLU(inplace=True)),
+        self.add_module('conv1', nn.Conv2d(num_input_features, bn_size *
+                                           growth_rate, kernel_size=1, stride=1,
+                                           bias=False)),
+        self.add_module('norm2', nn.BatchNorm2d(bn_size * growth_rate)),
+        self.add_module('relu2', nn.ReLU(inplace=True)),
+        self.add_module('conv2', nn.Conv2d(bn_size * growth_rate, growth_rate,
+                                           kernel_size=3, stride=1, padding=1,
+                                           bias=False)),
+        self.drop_rate = float(drop_rate)
 
-
-        self.drop_layer = nn.Dropout(p=0.5)
-
-
-        self.conv1 = nn.Conv2d(
-            in_channels=channels,
-            out_channels=num_kernels,
-            kernel_size=conv_structure[0][0],
-            padding=conv_structure[0][1],
-            stride=stride,
-            dilation=dilation,
-            groups=groups,
-            padding_mode='zeros'
-        )
-
-
-        self.pool1 = torch.nn.MaxPool2d(
-            kernel_size=conv_structure[1][0],
-            padding=conv_structure[1][1],
-            dilation=(dilation),
-            stride=conv_structure[1][2]
-        )
-
-        self.norm1 = torch.nn.BatchNorm2d(num_kernels)
-
-        n_out_channels = num_kernels * num_kernels
-        self.conv2 = nn.Conv2d(
-            in_channels=num_kernels,
-            out_channels=n_out_channels,
-            kernel_size=conv_structure[2][0],
-            padding=conv_structure[2][1],
-            stride=stride,
-            dilation=dilation,
-            groups=groups,
-            padding_mode='zeros'
-        )
-
-
-        self.pool2 = torch.nn.MaxPool2d(
-            kernel_size=conv_structure[3][0],
-            padding=conv_structure[3][1],
-            dilation=dilation,
-            stride=conv_structure[3][2],
-        )
-
-        self.norm2 = torch.nn.BatchNorm2d(n_out_channels)
-
-        # conv uout
-        c1height, c1width = self.calc_out_conv2d(
-            (height, width), padding=conv_structure[0][1], dilations=dilation, kernels=conv_structure[0][0], stride=stride)
-        print("height width", height, width)
-        # pool out
-        p1height, p1width = self.calc_out_pool2d(
-            (c1height, c1width), padding=conv_structure[1][1], dilations=dilation, kernels=conv_structure[1][0], stride=conv_structure[1][2])
-        print("p1height p1width", p1height, p1width)
-
-        c2height, c2width = self.calc_out_conv2d(
-            (p1height, p1width), padding=conv_structure[2][1], dilations=dilation, kernels=conv_structure[2][0], stride=stride)
-        print("c2height c2width", c2height, c2width)
-        # pool out
-        p2height, p2width = self.calc_out_pool2d(
-            (c2height, c2width), padding=conv_structure[3][1], dilations=dilation, kernels=conv_structure[3][0], stride=conv_structure[3][2])
-        print("n_out_channels p2height p2width", n_out_channels, p2height, p2width)
-        self.fc1 = nn.Linear(n_out_channels * p2height * p2width, n_out_channels * p2height * p2width // 2)
-        self.fc2 = nn.Linear(n_out_channels * p2height * p2width // 2, output_size)
-
-    def calc_out_conv2d(self, dims, padding, dilations, kernels, stride):
-        out = [0] * len(dims)
-        for i in range(len(dims)):
-            out[i] = dims[i] + 2 * padding[i] - \
-                dilations[i] * (kernels[i] - 1) - 1
-            out[i] = int(out[i] / stride[i]) + 1
-        return tuple(out)
-
-    def calc_out_pool2d(self, dims, padding, dilations, kernels, stride):
-        out = [0] * len(dims)
-        for i in range(len(dims)):
-            out[i] = dims[i] + 2 * padding[i] - \
-                dilations[i] * (kernels[i] - 1) - 1
-            out[i] = int(out[i] / stride[i]) + 1
-        return tuple(out)
+    def bn_function(self, inputs):
+        # type: (List[Tensor]) -> Tensor
+        concated_features = torch.cat(inputs, 1)
+        bottleneck_output = self.conv1(self.relu1(self.norm1(concated_features)))  # noqa: T484
+        return bottleneck_output
 
     def forward(self, input):
-        # print("input", input.size())
+        if isinstance(input, Tensor):
+            prev_features = [input]
+        else:
+            prev_features = input
 
-        c1out = self.drop_layer(F.relu(self.norm1(self.conv1(input))))
-        # print("cout", cout.size())
+        bottleneck_output = self.bn_function(prev_features)
 
-        p1out = self.pool1(c1out)
-        # print("pout", pout.size())
+        new_features = self.conv2(self.relu2(self.norm2(bottleneck_output)))
+        if self.drop_rate > 0:
+            new_features = F.dropout(new_features, p=self.drop_rate,
+                                     training=self.training)
+        return new_features
 
-        c2out = self.drop_layer(F.relu(self.norm2(self.conv2(p1out))))
-        p2out = self.pool2(c2out)
 
-        fc1out = self.drop_layer(F.relu(self.fc1(p2out.view(input.size()[0], -1))))
-        out = self.fc2(fc1out)
+class _DenseBlock(nn.ModuleDict):
+    _version = 2
 
+    def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate):
+        super(_DenseBlock, self).__init__()
+        for i in range(num_layers):
+            layer = _DenseLayer(
+                num_input_features + i * growth_rate,
+                growth_rate=growth_rate,
+                bn_size=bn_size,
+                drop_rate=drop_rate,
+            )
+            self.add_module('denselayer%d' % (i + 1), layer)
+
+    def forward(self, init_features):
+        features = [init_features]
+        for name, layer in self.items():
+            new_features = layer(features)
+            features.append(new_features)
+        return torch.cat(features, 1)
+
+
+class _Transition(nn.Sequential):
+    def __init__(self, num_input_features, num_output_features):
+        super(_Transition, self).__init__()
+        self.add_module('norm', nn.BatchNorm2d(num_input_features))
+        self.add_module('relu', nn.ReLU(inplace=True))
+        self.add_module('conv', nn.Conv2d(num_input_features, num_output_features,
+                                          kernel_size=1, stride=1, bias=False))
+        self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=1))
+
+
+class DenseNet(nn.Module):
+    r"""Densenet-BC model class, based on
+    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
+
+    Args:
+        growth_rate (int) - how many filters to add each layer (`k` in paper)
+        block_config (list of 4 ints) - how many layers in each pooling block
+        num_init_features (int) - the number of filters to learn in the first convolution layer
+        bn_size (int) - multiplicative factor for number of bottle neck layers
+          (i.e. bn_size * k features in the bottleneck layer)
+        drop_rate (float) - dropout rate after each dense layer
+        num_classes (int) - number of classification classes
+        memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
+          but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_
+    """
+
+    __constants__ = ['features']
+
+    def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
+                 num_init_features=64, bn_size=4, drop_rate=0, num_classes=1):
+
+        super(DenseNet, self).__init__()
+
+        # First convolution
+        self.features = nn.Sequential(OrderedDict([
+            ('conv0', nn.Conv2d(1, num_init_features, kernel_size=3, stride=1,
+                                padding=1, bias=False)),
+            ('norm0', nn.BatchNorm2d(num_init_features)),
+            ('relu0', nn.ReLU(inplace=True)),
+            ('pool0', nn.MaxPool2d(kernel_size=3, stride=1, padding=1)),
+        ]))
+
+        # Each denseblock
+        num_features = num_init_features
+        for i, num_layers in enumerate(block_config):
+            block = _DenseBlock(
+                num_layers=num_layers,
+                num_input_features=num_features,
+                bn_size=bn_size,
+                growth_rate=growth_rate,
+                drop_rate=drop_rate,
+            )
+            self.features.add_module('denseblock%d' % (i + 1), block)
+            num_features = num_features + num_layers * growth_rate
+            if i != len(block_config) - 1:
+                trans = _Transition(num_input_features=num_features,
+                                    num_output_features=num_features // 2)
+                self.features.add_module('transition%d' % (i + 1), trans)
+                num_features = num_features // 2
+
+        # Final batch norm
+        self.features.add_module('norm5', nn.BatchNorm2d(num_features))
+
+        # Linear layer
+        self.classifier = nn.Linear(num_features, num_classes)
+
+        # Official init from torch repo.
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        features = self.features(x)
+        out = F.relu(features, inplace=True)
+        out = F.adaptive_avg_pool2d(out, (1, 1))
+        out = torch.flatten(out, 1)
+        out = self.classifier(out)
         return out
+
+
+def _densenet(arch, growth_rate, block_config, num_init_features,
+              **kwargs):
+    model = DenseNet(growth_rate, block_config, num_init_features, **kwargs)
+    return model
+
+
+def densenet(**kwargs):
+    r"""Densenet-121 model from
+    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
+    """
+    return _densenet('densenet', 32, (6, 12, 24, 16), 64, **kwargs)

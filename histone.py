@@ -1,5 +1,5 @@
 from preprocess import HistoneDataset
-from model import CNN
+from model import densenet
 from torch.utils.data import DataLoader, random_split
 from torch import nn, optim
 from torch.nn import functional as F
@@ -84,6 +84,7 @@ def test(model, test_loader, hyperparams):
 # python histone.py -s -S ./data -T data/train.npz -t data/eval.npz
 # python histone.py -s -L ./data -T data/train.npz -t data/eval.npz
 # python histone.py -lL ./data -t data/eval.npz
+# mv model.py
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--load", action="store_true",
@@ -97,23 +98,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     hyperparams = {
-        "stride": (1, 1),
-        "dilation": (1, 1),
-        "groups": 1,
-        "num_kernels": 20,
-        "output_size": 1,
-        "num_epochs": 1,
-        "batch_size": 50,
+        "num_epochs": 3,
+        "batch_size": 20,
         "learning_rate": 0.001,
-        "conv_structure": [
-            ((10, 2), (5, 1)),
-            ((3, 3), (1, 1), (3, 3)),
-            ((4, 2), (2, 1)),
-            ((3, 3), (1, 1), (3, 3)),
-        ]
     }
 
-    model = None
+    model = densenet().to(device)
     train_dataset = None
     validate_dataset = None
     test_dataset = None
@@ -124,19 +114,6 @@ if __name__ == "__main__":
 
         split_amount = int(len(dataset) * 0.9)
 
-        model = CNN(
-            channels=1,
-            width=dataset.width,
-            height=dataset.height,
-            batch_size=hyperparams["batch_size"],
-            stride=hyperparams["stride"],
-            dilation=hyperparams["dilation"],
-            groups=hyperparams["groups"],
-            num_kernels=hyperparams["num_kernels"],
-            output_size=hyperparams["output_size"],
-            conv_structure=hyperparams["conv_structure"]
-        ).to(device)
-
         train_dataset, validate_dataset = random_split(
             dataset, (split_amount, len(dataset) - split_amount))
 
@@ -144,20 +121,6 @@ if __name__ == "__main__":
         test_file = args.test[0]
 
         test_dataset = HistoneDataset(test_file, args.savedata, args.loaddata, "eval")
-
-        if model is None:
-            model = CNN(
-                channels=1,
-                width=test_dataset.width,
-                height=test_dataset.height,
-                batch_size=hyperparams["batch_size"],
-                stride=hyperparams["stride"],
-                dilation=hyperparams["dilation"],
-                groups=hyperparams["groups"],
-                num_kernels=hyperparams["num_kernels"],
-                output_size=hyperparams["output_size"],
-                conv_structure=hyperparams["conv_structure"]
-            ).to(device)
 
     train_loader = None
     if args.train:
