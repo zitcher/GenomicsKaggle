@@ -3,11 +3,16 @@ from model import Linear
 from torch.utils.data import DataLoader, random_split
 from torch import nn, optim
 from torch.nn import functional as F
+from sklearn.tree import DecisionTreeRegressor
 import torch
 import numpy as np
 import argparse
 from tqdm import tqdm  # optional progress bar
 import pandas as pd
+from sklearn.experimental import enable_hist_gradient_boosting
+from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor, HistGradientBoostingRegressor
+import numpy as np
+from joblib import dump, load
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -15,69 +20,58 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def train(model, train_loader, hyperparams):
     print("starting train")
 
-    loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
-    optimizer = optim.Adam(model.parameters(), hyperparams['learning_rate'])
+    X = []
+    y = []
 
-    model = model.train()
-    for epoch in range(hyperparams['num_epochs']):
-        for batch in tqdm(train_loader):
-            x = batch['x']
-            y = batch['y']
-            # print("x", x.size())
-            x = x.to(device)
-            y = y.to(device)
+    for batch in tqdm(train_loader):
+        X.append(batch['x'].flatten().numpy())
+        y.append(batch['y'].numpy()[0])
 
-            optimizer.zero_grad()
-            y_pred = model(x)
-
-            loss = loss_fn(y_pred, y)
-
-            loss.backward()  # calculate gradients
-            optimizer.step()  # update model weights
-
-            print("loss:", loss.item())
+    model.fit(X, y)
 
 
+
+# def validate(model, validate_loader, hyperparams):
+#     print("starting validation")
+#     mse = []
+#
+#     for batch in tqdm(validate_loader):
+#         y = batch['y'].numpy()[0]
+#         predict = model.predict([batch['x'].flatten().numpy()])[0]
+#         # print("predict", predict, "y", y)
+#         score = (predict - y) ** 2
+#         mse.append(score)
+#
+#     print("Validation MSE", np.mean(mse))
 def validate(model, validate_loader, hyperparams):
     print("starting validation")
-    loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
-
-    model = model.eval()
-    losses = []
-
+    X = []
+    y = []
+    mse = []
     for batch in tqdm(validate_loader):
-        x = batch['x']
-        y = batch['y']
-        x = x.to(device)
-        y = y.to(device)
+        X.append(batch['x'].flatten().numpy())
+        y.append(batch['y'].numpy()[0])
 
-        y_pred = model(x)
+    predictions = model.predict(X)
 
-        loss = loss_fn(y_pred, y)
+    for i in range(len(predictions)):
+        score = (predictions[i] - y[i]) ** 2
+        mse.append(score)
 
-        losses.append(loss.item())
-
-    print("mean loss:", np.mean(losses))
-
+    print("Validation MSE", np.mean(mse))
 
 def test(model, test_loader, hyperparams):
     print("starting test")
-    model = model.eval()
     classification = []
-
     for batch in tqdm(test_loader):
-        x = batch['x']
         cell_type = batch['cell_type']
         id = batch['id']
-        x = x.to(device)
-
-        y_pred = model(x)
-        for i in range(y_pred.size()[0]):
-            # print(cell_type[i].item(), id[i].item(), y_pred[i].item())
-            classification.append((cell_type[i].item() + "_" + str(int(id[i].item())), str(y_pred[i].item())))
+        predict = model.predict([batch['x'].flatten().numpy()])[0]
+        classification.append((cell_type[0].item() + "_" + str(int(id[0].item())), str(predict)))
 
     df = pd.DataFrame(classification, columns=['id', 'expression'])
-    df.to_csv('submission.csv', index=False)
+    df.to_csv('submission1.csv', index=False)
+
 
 # python histone.py -s -S ./data -T data/train.npz -t data/eval.npz
 # python histone.py -s -L ./data -T data/train.npz -t data/eval.npz
@@ -96,23 +90,23 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     hyperparams = {
-        "batch_size": 50,
-        "learning_rate": 0.001,
-        "num_epochs": 1
+        "batch_size": 1,
     }
 
-    model = None
+    # rng = np.random.RandomState(1)
+    # model = AdaBoostRegressor(DecisionTreeRegressor(max_depth=3), n_estimators=2000, random_state=rng)
+    # model = RandomForestRegressor(n_estimators=500, max_depth=2, random_state=0)
+    model = HistGradientBoostingRegressor()
     train_dataset = None
     validate_dataset = None
     test_dataset = None
+
 
     if args.train:
         train_file = args.train[0]
         dataset = HistoneDataset(train_file, args.savedata, args.loaddata, "train")
 
-        split_amount = int(len(dataset) * 0.9)
-
-        model = Linear().to(device)
+        split_amount = int(len(dataset) * 0.8)
 
         train_dataset, validate_dataset = random_split(
             dataset, (split_amount, len(dataset) - split_amount))
@@ -121,9 +115,6 @@ if __name__ == "__main__":
         test_file = args.test[0]
 
         test_dataset = HistoneDataset(test_file, args.savedata, args.loaddata, "eval")
-
-        if model is None:
-            model = Linear().to(device)
 
     train_loader = None
     if args.train:
@@ -140,7 +131,7 @@ if __name__ == "__main__":
 
     if args.load:
         print("loading saved model...")
-        model.load_state_dict(torch.load('./model.pt'))
+        model = load('./model.pt')
     if args.train:
         print("running training loop...")
         train(model, train_loader, hyperparams)
@@ -150,4 +141,4 @@ if __name__ == "__main__":
         test(model, test_loader, hyperparams)
     if args.save:
         print("saving model...")
-        torch.save(model.state_dict(), './model.pt')
+        dump(model, './model.pt')
