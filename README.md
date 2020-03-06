@@ -13,6 +13,10 @@ Deephistone: https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-019-5
 
 https://arxiv.org/abs/1808.03867
 
+# Contains List of Famous Models You can Reference for Architecture
+
+https://arxiv.org/pdf/1901.06032.pdf
+
 # Preprocess
 `python preprocess.py data/train.npz`
 `python preprocess.py data/eval.npz`
