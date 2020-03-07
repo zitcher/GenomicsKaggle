@@ -73,7 +73,7 @@ class _Transition(nn.Sequential):
                                           kernel_size=1, stride=1, bias=False))
         self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=1))
 
-
+# 3.49
 class DenseNet(nn.Module):
     r"""Densenet-BC model class, based on
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
@@ -159,4 +159,4 @@ def densenet(**kwargs):
     r"""Densenet-121 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
     """
-    return _densenet('densenet', 32, (6, 12, 24, 16), 64, **kwargs)
+    return _densenet('densenet', 32, (3, 6, 12, 8), 64, **kwargs)
