@@ -20,6 +20,7 @@ def train(model, train_loader, hyperparams):
 
     model = model.train()
     for epoch in range(hyperparams['num_epochs']):
+        epoch_loss = 0
         for batch in tqdm(train_loader):
             x = batch['x']
             y = batch['y']
@@ -31,11 +32,15 @@ def train(model, train_loader, hyperparams):
             y_pred = model(x)
 
             loss = loss_fn(y_pred, y)
+            epoch_loss = loss
 
             loss.backward()  # calculate gradients
             optimizer.step()  # update model weights
 
-            print("loss:", loss.item())
+            #print("loss:", loss.item())
+
+        print('EPOCH NUMBER: {} | Loss Value: {}'.format(epoch, epoch_loss))
+
 
 
 def validate(model, validate_loader, hyperparams):
@@ -97,15 +102,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     hyperparams = {
-        "stride": (1, 1),
+        "stride": (10, 10),
         "padding": (0, 2),
         "dilation": (1, 1),
         "groups": 1,
-        "num_kernels": 3,
+        "num_kernels": 50,
         "kernel_size": (5, 5),
         "output_size": 1,
         "pool_size": (5, 5),
-        "num_epochs": 1,
+        "num_epochs": 15,
         "batch_size": 50,
         "learning_rate": 0.001
     }
@@ -180,6 +185,7 @@ if __name__ == "__main__":
         print("running training loop...")
         train(model, train_loader, hyperparams)
         validate(model, validate_loader, hyperparams)
+
     if args.test:
         print("running testing loop...")
         test(model, test_loader, hyperparams)

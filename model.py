@@ -65,7 +65,12 @@ class CNN(nn.Module):
         # print("height width", height, width)
         # print("cheight cwidth", num_kernels, cheight, cwidth)
         # print("pheight pwidth", num_kernels, pheight, pwidth)
-        self.fc = nn.Linear(num_kernels * pheight * pwidth, output_size)
+
+        self.fc1 = nn.Linear(num_kernels * pheight * pwidth, 625)
+        self.fc2 = nn.Linear(625, 125)
+        self.fc3 = nn.Linear(125, output_size)
+
+        #self.fc = nn.Linear(num_kernels * pheight * pwidth, output_size)
 
     def calc_out_conv2d(self, dims, padding, dilations, kernels, stride):
         out = [0] * len(dims)
@@ -89,9 +94,14 @@ class CNN(nn.Module):
         cout = self.conv(input)
         # print("cout", cout.size())
 
-        pout = self.pool(F.relu(cout))
-        # print("pout", pout.size())
+        pout = F.dropout(self.pool(F.relu(cout)))
 
-        out = self.fc(pout.view(input.size()[0], -1))
+        out1 = self.fc1(pout.view(input.size()[0], -1))
+        out2 = self.fc2(out1)
+        out3 = self.fc3(out2)
 
-        return out
+        # print('out size: {}'.format(out1.size()))
+        # print('out size: {}'.format(out2.size()))
+        # print('out size: {}'.format(out3.size()))
+
+        return out3
