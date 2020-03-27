@@ -16,12 +16,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hyperparams = {
     "batch_size": 20,
-    "learning_rate": 0.001,
+    "learning_rate": 0.0005,
     "num_epochs": 2,
-    "embed_size": 264,
-    "n_layer": 12,
-    "n_head": 6,
-    "d_inner": 1024,
+    "embed_size": 10,
+    "n_layer": 6,
+    "n_head": 2,
+    "d_inner": 10,
 }
 
 train_cells = ['E065', 'E004', 'E066', 'E005', 'E012', 'E027', 'E053', 'E013', 'E028', 'E061', 'E109', 'E120', 'E062', 'E037', 'E038', 'E024', 'E105', 'E011', 'E106', 'E082', 'E097', 'E116', 'E098', 'E058',
@@ -40,15 +40,24 @@ def train(model, embeddor, train_loader):
 
     model = model.train()
     for epoch in range(hyperparams['num_epochs']):
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = hyperparams['learning_rate'] * 0.1 ** epoch
         for batch in tqdm(train_loader):
             x = batch['x']
             y = batch['y']
+            cell_num = batch['cell_num']
             # print("x", x.size())
             x = x.to(device)
             y = y.to(device)
+            cell_num = cell_num.to(device)
 
             optimizer.zero_grad()
-            embedded = embeddor(x)
+            embedded = embeddor(cell_num).unsqueeze(1)
+            # print("embedded", embedded.size())
+            x = torch.cat((x, x), 2)
+            # print("x", x.size())
+            x = torch.cat((embedded, x), 1)
+            # print("x", x.size())
             y_pred = model(None, inputs_embeds=embedded)[0].squeeze()
             # torch.set_printoptions(profile="full")
             # print("y_pred", y_pred)
@@ -73,10 +82,18 @@ def validate(model, embeddor, validate_loader):
     for batch in tqdm(validate_loader):
         x = batch['x']
         y = batch['y']
+        cell_num = batch['cell_num']
+        # print("x", x.size())
         x = x.to(device)
         y = y.to(device)
+        cell_num = cell_num.to(device)
 
-        embedded = embeddor(x)
+        embedded = embeddor(cell_num).unsqueeze(1)
+        # print("embedded", embedded.size())
+        x = torch.cat((x, x), 2)
+        # print("x", x.size())
+        x = torch.cat((embedded, x), 1)
+        # print("x", x.size())
         y_pred = model(None, inputs_embeds=embedded)[0].squeeze()
 
         loss = loss_fn(y_pred, y)
@@ -96,9 +113,16 @@ def test(model, embeddor, test_loader):
         x = batch['x']
         cell_type = batch['cell_type']
         id = batch['id']
+        cell_num = batch['cell_num']
         x = x.to(device)
+        cell_num = cell_num.to(device)
 
-        embedded = embeddor(x)
+        embedded = embeddor(cell_num).unsqueeze(1)
+        # print("embedded", embedded.size())
+        x = torch.cat((x, x), 2)
+        # print("x", x.size())
+        x = torch.cat((embedded, x), 1)
+        # print("x", x.size())
         y_pred = model(None, inputs_embeds=embedded)[0].squeeze()
         y_pred = y_pred.detach().cpu()
         for i in range(y_pred.size()[0]):
@@ -112,9 +136,10 @@ def test(model, embeddor, test_loader):
     df = pd.DataFrame(classification, columns=['id', 'expression'])
     df.to_csv('submission.csv', index=False)
 
-
+# nohup 2>&1 python histone.py -s -S ./data -T data/train.npz -t data/eval.npz &
 # python histone.py -s -S ./data -T data/train.npz -t data/eval.npz
 # python histone.py -s -L ./data -T data/train.npz -t data/eval.npz
+# python histone.py -lsL ./data -T data/train.npz -t data/eval.npz
 # python histone.py -lL ./data -t data/eval.npz
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -133,8 +158,10 @@ if __name__ == "__main__":
     validate_dataset = None
     test_dataset = None
 
+
     embeddor = Embeddor(
-        in_size=5, out_size=hyperparams["embed_size"]).to(device)
+        num_embeddings=len(set(train_cells).union(set(eval_cells))), embedding_dim=hyperparams["embed_size"])
+    embeddor = embeddor.to(device)
     configuration = XLNetConfig(
         vocab_size=0,
         num_labels=1,
