@@ -42,17 +42,19 @@ class HistoneDataset(Dataset):
                 cell_data = self.npdata[cell]
                 id = cell_data[:, 0, 0]
                 hm_data = cell_data[:, :, 1:6]
-                exp_values = cell_data[:, 0, 6]
+                exp_values = cell_data[:, 0, 6]  # cell_data[:, 0, 6]
                 ids.append(id)
                 input.append(hm_data)
                 output.append(exp_values)
                 type.extend([cell] * cell_data.shape[0])
 
-            # [cell_types*genes, bins, histomes]
+            # [cell_types*genes, seq_len (bin), embed (histones)]
             input = np.concatenate(input, axis=0)
-            # [cell_types*genes, expression]
+            # [cell_types*genes]
             output = np.concatenate(output, axis=0)
+            # [cell_types*genes]
             ids = np.concatenate(ids, axis=0)
+            # [cell_types*genes]
             type = np.asarray(type)
 
             if save_path is not None:
@@ -66,9 +68,11 @@ class HistoneDataset(Dataset):
         self.id = ids
         self.type = type
 
+        # [cell_types*genes, seq_len (bin), embed (histones)]
         for x in input:
             self.x.append(torch.tensor(x))
 
+        # [cell_types*genes, seq_len (bin)]
         for y in output:
             self.y.append(torch.tensor(y))
 
