@@ -5,7 +5,7 @@ from collections import OrderedDict
 from torch import Tensor
 
 
-# Taken from https://pytorch.org/docs/stable/_modules/torchvision/models/densenet.html
+# Based on https://pytorch.org/docs/stable/_modules/torchvision/models/densenet.html
 class _DenseLayer(nn.Module):
     def __init__(self, num_input_features, growth_rate, bn_size, drop_rate):
         super(_DenseLayer, self).__init__()
@@ -15,7 +15,7 @@ class _DenseLayer(nn.Module):
                                            growth_rate, kernel_size=1, stride=1,
                                            bias=False)),
         self.add_module('norm2', nn.BatchNorm2d(bn_size * growth_rate)),
-        self.add_module('relu2', nn.ReLU(inplace=True)),
+        self.add_module('relu2', nn.ELU(inplace=True)),
         self.add_module('conv2', nn.Conv2d(bn_size * growth_rate, growth_rate,
                                            kernel_size=3, stride=1, padding=1,
                                            bias=False)),
@@ -71,6 +71,7 @@ class _Transition(nn.Sequential):
         self.add_module('relu', nn.ReLU(inplace=True))
         self.add_module('conv', nn.Conv2d(num_input_features, num_output_features,
                                           kernel_size=1, stride=1, bias=False))
+        # self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=1))
         self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=1))
 
 # 3.49
@@ -93,7 +94,7 @@ class DenseNet(nn.Module):
     __constants__ = ['features']
 
     def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
-                 num_init_features=64, bn_size=4, drop_rate=0, num_classes=1):
+                 num_init_features=64, bn_size=4, drop_rate=0.2, num_classes=1):
 
         super(DenseNet, self).__init__()
 
@@ -102,7 +103,7 @@ class DenseNet(nn.Module):
             ('conv0', nn.Conv2d(1, num_init_features, kernel_size=3, stride=1,
                                 padding=1, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
-            ('relu0', nn.ReLU(inplace=True)),
+            ('relu0', nn.ELU(inplace=True)),
             ('pool0', nn.MaxPool2d(kernel_size=3, stride=1, padding=1)),
         ]))
 
@@ -159,4 +160,4 @@ def densenet(**kwargs):
     r"""Densenet-121 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
     """
-    return _densenet('densenet', 32, (3, 6, 12, 8), 64, **kwargs)
+    return _densenet('densenet', 2, (3, 6, 6, 3), 16, **kwargs)

@@ -11,8 +11,14 @@ import pandas as pd
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+hyperparams = {
+    "num_epochs": 1,
+    "batch_size": 40,
+    "learning_rate": 0.001,
+}
 
-def train(model, train_loader, hyperparams):
+
+def train(model, train_loader):
     print("starting train")
 
     loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
@@ -26,6 +32,7 @@ def train(model, train_loader, hyperparams):
             x = x.unsqueeze(1)
             x = x.to(device)
             y = y.to(device)
+            # x = torch.cat((x, x), 2)
 
             optimizer.zero_grad()
             y_pred = model(x)
@@ -38,7 +45,7 @@ def train(model, train_loader, hyperparams):
             print("loss:", loss.item())
 
 
-def validate(model, validate_loader, hyperparams):
+def validate(model, validate_loader):
     print("starting validation")
     loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
 
@@ -51,6 +58,7 @@ def validate(model, validate_loader, hyperparams):
         x = x.unsqueeze(1)
         x = x.to(device)
         y = y.to(device)
+        # x = torch.cat((x, x), 2)
 
         y_pred = model(x)
 
@@ -61,7 +69,7 @@ def validate(model, validate_loader, hyperparams):
     print("mean loss:", np.mean(losses))
 
 
-def test(model, test_loader, hyperparams):
+def test(model, test_loader):
     print("starting test")
     model = model.eval()
     classification = []
@@ -72,6 +80,7 @@ def test(model, test_loader, hyperparams):
         id = batch['id']
         x = x.unsqueeze(1)
         x = x.to(device)
+        # x = torch.cat((x, x), 2)
 
         y_pred = model(x)
         for i in range(y_pred.size()[0]):
@@ -93,15 +102,9 @@ if __name__ == "__main__":
                         help="save model.pt")
     parser.add_argument("-T", "--train", nargs=1, help="train model")
     parser.add_argument("-t", "--test", nargs=1, help="test model")
-    parser.add_argument("-S", "--savedata", nargs=1, help="save data")
-    parser.add_argument("-L", "--loaddata", nargs=1, help="load data")
     args = parser.parse_args()
 
-    hyperparams = {
-        "num_epochs": 3,
-        "batch_size": 20,
-        "learning_rate": 0.001,
-    }
+    print("Device", device)
 
     model = densenet().to(device)
     train_dataset = None
@@ -110,7 +113,7 @@ if __name__ == "__main__":
 
     if args.train:
         train_file = args.train[0]
-        dataset = HistoneDataset(train_file, args.savedata, args.loaddata, "train")
+        dataset = HistoneDataset(train_file)
 
         split_amount = int(len(dataset) * 0.9)
 
@@ -120,7 +123,7 @@ if __name__ == "__main__":
     if args.test:
         test_file = args.test[0]
 
-        test_dataset = HistoneDataset(test_file, args.savedata, args.loaddata, "eval")
+        test_dataset = HistoneDataset(test_file)
 
     train_loader = None
     if args.train:
@@ -140,11 +143,11 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load('./model.pt'))
     if args.train:
         print("running training loop...")
-        train(model, train_loader, hyperparams)
-        validate(model, validate_loader, hyperparams)
+        train(model, train_loader)
+        validate(model, validate_loader)
     if args.test:
         print("running testing loop...")
-        test(model, test_loader, hyperparams)
+        test(model, test_loader)
     if args.save:
         print("saving model...")
         torch.save(model.state_dict(), './model.pt')
