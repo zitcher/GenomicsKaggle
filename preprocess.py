@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 
 
 class HistoneDataset(Dataset):
-    def __init__(self, input_file, save_path=None, load_path=None, mode="train"):
+    def __init__(self, input_file):
         """
         :param input_file: the data file pathname
         """
@@ -49,38 +49,26 @@ class HistoneDataset(Dataset):
         type = []
         cell_nums = []
 
-        if load_path is not None:
-            input = np.load(load_path[0] + "/" + mode + "/x.npy")
-            output = np.load(load_path[0] + "/" + mode + "/y.npy")
-            ids = np.load(load_path[0] + "/" + mode + "/id.npy")
-            type = np.load(load_path[0] + "/" + mode + "/type.npy")
-        else:
-            for cell in self.cell_types:
-                cell_data = self.npdata[cell]
-                cell_num = all_cells[cell]
-                id = cell_data[:, 0, 0]
-                hm_data = cell_data[:, :, 1:6]
-                exp_values = cell_data[:, 0, 6]  # cell_data[:, 0, 6]
-                ids.append(id)
-                input.append(hm_data)
-                output.append(exp_values)
-                cell_nums.extend([cell_num] * cell_data.shape[0])
-                type.extend([cell] * cell_data.shape[0])
+        for cell in self.cell_types:
+            cell_data = self.npdata[cell]
+            cell_num = all_cells[cell]
+            id = cell_data[:, 0, 0]
+            hm_data = cell_data[:, :, 1:6]
+            exp_values = cell_data[:, 0, 6]  # cell_data[:, 0, 6]
+            ids.append(id)
+            input.append(hm_data)
+            output.append(exp_values)
+            cell_nums.extend([cell_num] * cell_data.shape[0])
+            type.extend([cell] * cell_data.shape[0])
 
-            # [cell_types*genes, seq_len (bin), embed (histones)]
-            input = np.concatenate(input, axis=0)
-            # [cell_types*genes]
-            output = np.concatenate(output, axis=0)
-            # [cell_types*genes]
-            ids = np.concatenate(ids, axis=0)
-            # [cell_types*genes]
-            type = np.asarray(type)
-
-            if save_path is not None:
-                np.save(save_path[0] + "/" + mode + "/x", input)
-                np.save(save_path[0] + "/" + mode + "/y", output)
-                np.save(save_path[0] + "/" + mode + "/id", ids)
-                np.save(save_path[0] + "/" + mode + "/type", type)
+        # [cell_types*genes, seq_len (bin), embed (histones)]
+        input = np.concatenate(input, axis=0)
+        # [cell_types*genes]
+        output = np.concatenate(output, axis=0)
+        # [cell_types*genes]
+        ids = np.concatenate(ids, axis=0)
+        # [cell_types*genes]
+        type = np.asarray(type)
 
         self.x = []
         self.y = []

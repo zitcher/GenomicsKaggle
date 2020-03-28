@@ -7,7 +7,7 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm  # optional progress bar
-from transformers import XLNetConfig, XLNetForSequenceClassification
+from transformers import BertConfig, BertForSequenceClassification
 
 from model import Embeddor
 from preprocess import HistoneDataset
@@ -17,11 +17,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 hyperparams = {
     "batch_size": 20,
     "learning_rate": 0.0005,
-    "num_epochs": 2,
+    "num_epochs": 1,
     "embed_size": 10,
     "n_layer": 6,
     "n_head": 2,
-    "d_inner": 10,
+    "d_inner": 200,
 }
 
 train_cells = ['E065', 'E004', 'E066', 'E005', 'E012', 'E027', 'E053', 'E013', 'E028', 'E061', 'E109', 'E120', 'E062', 'E037', 'E038', 'E024', 'E105', 'E011', 'E106', 'E082', 'E097', 'E116', 'E098', 'E058',
@@ -40,8 +40,6 @@ def train(model, embeddor, train_loader):
 
     model = model.train()
     for epoch in range(hyperparams['num_epochs']):
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = hyperparams['learning_rate'] * 0.1 ** epoch
         for batch in tqdm(train_loader):
             x = batch['x']
             y = batch['y']
@@ -136,11 +134,10 @@ def test(model, embeddor, test_loader):
     df = pd.DataFrame(classification, columns=['id', 'expression'])
     df.to_csv('submission.csv', index=False)
 
-# nohup 2>&1 python histone.py -s -S ./data -T data/train.npz -t data/eval.npz &
-# python histone.py -s -S ./data -T data/train.npz -t data/eval.npz
-# python histone.py -s -L ./data -T data/train.npz -t data/eval.npz
-# python histone.py -lsL ./data -T data/train.npz -t data/eval.npz
-# python histone.py -lL ./data -t data/eval.npz
+# nohup 2>&1 python histone.py -s -T data/train.npz -t data/eval.npz &
+# python histone.py -s  -T data/train.npz -t data/eval.npz
+# python histone.py -ls -T data/train.npz -t data/eval.npz
+# python histone.py -l -t data/eval.npz
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--load", action="store_true",
@@ -149,8 +146,6 @@ if __name__ == "__main__":
                         help="save model.pt")
     parser.add_argument("-T", "--train", nargs=1, help="train model")
     parser.add_argument("-t", "--test", nargs=1, help="test model")
-    parser.add_argument("-S", "--savedata", nargs=1, help="save data")
-    parser.add_argument("-L", "--loaddata", nargs=1, help="load data")
     args = parser.parse_args()
 
     model = None
@@ -158,25 +153,25 @@ if __name__ == "__main__":
     validate_dataset = None
     test_dataset = None
 
+    print("device", device)
 
     embeddor = Embeddor(
         num_embeddings=len(set(train_cells).union(set(eval_cells))), embedding_dim=hyperparams["embed_size"])
     embeddor = embeddor.to(device)
-    configuration = XLNetConfig(
-        vocab_size=0,
+    configuration = BertConfig(
+        vocab_size=10,
         num_labels=1,
-        d_model=hyperparams["embed_size"],
-        n_layer=hyperparams["n_layer"],
-        n_head=hyperparams["n_head"],
-        d_inner=hyperparams["d_inner"]
+        hidden_size=hyperparams["embed_size"],
+        num_hidden_layers=hyperparams["n_layer"],
+        num_attention_heads=hyperparams["n_head"],
+        intermediate_size=hyperparams["d_inner"],
     )
-    model = XLNetForSequenceClassification(configuration).to(device)
+    model = BertForSequenceClassification(configuration).to(device)
 
     print("loading data")
     if args.train:
         train_file = args.train[0]
-        dataset = HistoneDataset(
-            train_file, args.savedata, args.loaddata, "train")
+        dataset = HistoneDataset(train_file)
 
         split_amount = int(len(dataset) * 0.9)
         train_dataset, validate_dataset = random_split(
@@ -185,8 +180,7 @@ if __name__ == "__main__":
     if args.test:
         test_file = args.test[0]
 
-        test_dataset = HistoneDataset(
-            test_file, args.savedata, args.loaddata, "eval")
+        test_dataset = HistoneDataset(test_file)
 
     train_loader = None
     if args.train:
