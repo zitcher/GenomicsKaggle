@@ -12,9 +12,9 @@ import pandas as pd
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hyperparams = {
-    "num_epochs": 1,
+    "num_epochs": 2,
     "batch_size": 50,
-    "learning_rate": 0.001,
+    "learning_rate": 0.0001,
 }
 
 
@@ -31,7 +31,6 @@ def train(model, train_loader):
             x = batch['x']
             y = batch['y']
             x = x.unsqueeze(1)
-            x = torch.cat((x, x, x), 2)
             x = x.to(device)
             y = y.to(device)
 
@@ -59,7 +58,6 @@ def validate(model, validate_loader):
         x = batch['x']
         y = batch['y']
         x = x.unsqueeze(1)
-        x = torch.cat((x, x, x), 2)
         x = x.to(device)
         y = y.to(device)
 
@@ -82,7 +80,6 @@ def test(model, test_loader):
         cell_type = batch['cell_type']
         id = batch['id']
         x = x.unsqueeze(1)
-        x = torch.cat((x, x, x), 2)
         x = x.to(device)
 
         y_pred = model(x)

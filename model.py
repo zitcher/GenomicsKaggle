@@ -100,8 +100,8 @@ class DenseNet(nn.Module):
 
         # First convolution
         self.features = nn.Sequential(OrderedDict([
-            ('conv0', nn.Conv2d(1, num_init_features, kernel_size=3, stride=1,
-                                padding=1, bias=False)),
+            ('conv0', nn.Conv2d(1, num_init_features, kernel_size=7, stride=1,
+                                padding=3, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
             ('relu0', nn.ReLU(inplace=True)),
             ('pool0', nn.MaxPool2d(kernel_size=3, stride=1, padding=1)),
@@ -160,4 +160,4 @@ def densenet(**kwargs):
     r"""Densenet-121 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
     """
-    return _densenet('densenet', 4, (4, 8, 16, 8), 16, **kwargs)
+    return _densenet('densenet', 4, (2, 4, 8, 2), 16, **kwargs)
