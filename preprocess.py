@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 
 
 class HistoneDataset(Dataset):
-    def __init__(self, input_file):
+    def __init__(self, input_file, cell=None):
         """
         :param input_file: the data file pathname
         """
@@ -32,7 +32,17 @@ class HistoneDataset(Dataset):
         # type
         type = []
 
-        for cell in self.cell_types:
+        if cell is None:
+            for cell in self.cell_types:
+                cell_data = self.npdata[cell]
+                id = cell_data[:, 0, 0]
+                hm_data = cell_data[:, :, 1:6]
+                exp_values = cell_data[:, 0, 6]
+                ids.append(id)
+                input.append(hm_data)
+                output.append(exp_values)
+                type.extend([cell] * cell_data.shape[0])
+        else:
             cell_data = self.npdata[cell]
             id = cell_data[:, 0, 0]
             hm_data = cell_data[:, :, 1:6]
@@ -48,6 +58,7 @@ class HistoneDataset(Dataset):
         output = np.concatenate(output, axis=0)
         ids = np.concatenate(ids, axis=0)
         type = np.asarray(type)
+
 
         self.x = []
         self.y = []

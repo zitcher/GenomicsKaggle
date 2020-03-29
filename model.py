@@ -160,4 +160,4 @@ def densenet(**kwargs):
     r"""Densenet-121 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
     """
-    return _densenet('densenet', 4, (2, 4, 8, 2), 16, **kwargs)
+    return _densenet('densenet', 2, (2, 4, 4, 4), 16, **kwargs)

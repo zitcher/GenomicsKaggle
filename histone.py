@@ -1,27 +1,47 @@
-from preprocess import HistoneDataset
-from model import densenet
-from torch.utils.data import DataLoader, random_split
+import argparse
+
+import numpy as np
+import pandas as pd
+import torch
 from torch import nn, optim
 from torch.nn import functional as F
-import torch
-import numpy as np
-import argparse
+from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm  # optional progress bar
-import pandas as pd
+
+from model import densenet
+from preprocess import HistoneDataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hyperparams = {
-    "num_epochs": 2,
-    "batch_size": 50,
-    "learning_rate": 0.0001,
+    "num_epochs": 4,
+    "batch_size": 20,
+    "learning_rate": 0.001,
 }
+
+
+def cells_to_id(cells):
+    cti = dict()
+    for i, cell in enumerate(cells):
+        cti[cell] = i
+    return cti
+
+train_cells = ['E065', 'E004', 'E066', 'E005', 'E012', 'E027', 'E053', 'E013', 'E028', 'E061', 'E109', 'E120', 'E062', 'E037', 'E038', 'E024', 'E105', 'E011', 'E106', 'E082', 'E097', 'E116', 'E098', 'E058',
+               'E117', 'E059', 'E070', 'E118', 'E085', 'E104', 'E119', 'E006', 'E127', 'E047', 'E094', 'E007', 'E054', 'E128', 'E095', 'E055', 'E114', 'E100', 'E056', 'E016', 'E122', 'E057', 'E123', 'E079', 'E003', 'E050']
+
+train_cells_dict = cells_to_id(train_cells)
+
+eval_cells = ['E065', 'E004', 'E066', 'E005', 'E012', 'E027', 'E053', 'E013', 'E028', 'E061', 'E109', 'E120', 'E062', 'E037', 'E038', 'E024', 'E071', 'E105', 'E087', 'E011', 'E106', 'E096', 'E082', 'E097',
+              'E116', 'E098', 'E058', 'E117', 'E084', 'E059', 'E070', 'E118', 'E085', 'E104', 'E119', 'E006', 'E112', 'E127', 'E047', 'E094', 'E007', 'E054', 'E113', 'E128', 'E095', 'E055', 'E114', 'E100', 'E056', 'E016', 'E122', 'E057', 'E123', 'E079', 'E003', 'E050']
+
+eval_cells_dict = cells_to_id(eval_cells)
 
 
 def train(model, train_loader):
     print("starting train")
 
-    loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
+    loss_fn = torch.nn.MSELoss(
+        size_average=None, reduce=None, reduction='mean')
     optimizer = optim.Adam(model.parameters(), hyperparams['learning_rate'])
 
     model = model.train()
@@ -47,9 +67,11 @@ def train(model, train_loader):
             print("loss:", loss.item())
             print("avg loss:", np.mean(losses))
 
+
 def validate(model, validate_loader):
     print("starting validation")
-    loss_fn = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
+    loss_fn = torch.nn.MSELoss(
+        size_average=None, reduce=None, reduction='mean')
 
     model = model.eval()
     losses = []
@@ -70,25 +92,37 @@ def validate(model, validate_loader):
     print("mean loss:", np.mean(losses))
 
 
-def test(model, test_loader):
+def test(models, test_loaders):
     print("starting test")
-    model = model.eval()
     classification = []
+    for cell in eval_cells:
+        test_loader = test_loaders[train_cells_dict[cell]]
+        cell_models = []
+        if cell in train_cells:
+            cell_models.append(models[train_cells_dict[cell]].to(device))
+        else:
+            cell_models.extend(models)
 
-    for batch in tqdm(test_loader):
-        x = batch['x']
-        cell_type = batch['cell_type']
-        id = batch['id']
-        x = x.unsqueeze(1)
-        x = x.to(device)
+        for batch in tqdm(test_loader):
+            x = batch['x']
+            id = batch['id']
+            x = x.unsqueeze(1)
+            x = x.to(device)
 
-        y_pred = model(x)
-        for i in range(y_pred.size()[0]):
-            # print(cell_type[i].item(), id[i].item(), y_pred[i].item())
-            classification.append((cell_type[i].item() + "_" + str(int(id[i].item())), str(y_pred[i].item())))
+            y_preds = []
+            for model in models:
+                y_preds.append(model(x))
+
+            y_pred = torch.mean(y_preds, 0)
+
+            for i in range(y_pred.size()[0]):
+                # print(cell_type[i].item(), id[i].item(), y_pred[i].item())
+                classification.append(
+                    (cell + "_" + str(int(id[i].item())), str(y_pred[i].item())))
 
     df = pd.DataFrame(classification, columns=['id', 'expression'])
     df.to_csv('submission.csv', index=False)
+
 
 # python histone.py -s -T data/train.npz -t data/eval.npz
 # python histone.py -l -T data/train.npz -t data/eval.npz
@@ -106,48 +140,69 @@ if __name__ == "__main__":
 
     print("Device", device)
 
-    model = densenet().to(device)
-    train_dataset = None
-    validate_dataset = None
-    test_dataset = None
+    models = dict()
+    for cell in train_cells:
+        model = densenet()
+        models[train_cells_dict[cell]] = model
+
+    train_datasets = dict()
+    validate_datasets = dict()
+    test_datasets = dict()
 
     if args.train:
         train_file = args.train[0]
-        dataset = HistoneDataset(train_file)
+        for cell in train_cells:
+            dataset = HistoneDataset(train_file, cell)
 
-        split_amount = int(len(dataset) * 0.9)
+            split_amount = int(len(dataset) * 0.95)
 
-        train_dataset, validate_dataset = random_split(
-            dataset, (split_amount, len(dataset) - split_amount))
+            train_dataset, validate_dataset = random_split(
+                dataset, (split_amount, len(dataset) - split_amount))
+
+            train_datasets[train_cells_dict[cell]] = train_dataset
+            validate_datasets[train_cells_dict[cell]] = validate_dataset
+
 
     if args.test:
         test_file = args.test[0]
+        for cell in eval_cells:
+            test_dataset = HistoneDataset(test_file, cell)
+            test_datasets[eval_cells_dict[cell]] = test_dataset
 
-        test_dataset = HistoneDataset(test_file)
-
-    train_loader = None
+    train_loaders = dict()
+    validate_loaders = dict()
     if args.train:
-        train_loader = DataLoader(
-            train_dataset, batch_size=hyperparams['batch_size'], shuffle=True
-        )
-        validate_loader = DataLoader(
-            validate_dataset, batch_size=hyperparams['batch_size'], shuffle=True
-        )
+        for cell in train_cells:
+            train_loader = DataLoader(
+                train_datasets[train_cells_dict[cell]], batch_size=hyperparams['batch_size'], shuffle=True
+            )
+            validate_loader = DataLoader(
+                validate_datasets[train_cells_dict[cell]], batch_size=hyperparams['batch_size'], shuffle=True
+            )
 
-    test_loader = None
+            train_loaders[train_cells_dict[cell]] = train_loader
+            validate_loaders[train_cells_dict[cell]] = validate_loader
+
+    test_loaders = dict()
     if args.test:
-        test_loader = DataLoader(test_dataset, batch_size=hyperparams['batch_size'])
+        for cell in eval_cells:
+            test_loader = DataLoader(test_datasets[eval_cells_dict[cell]], batch_size=hyperparams['batch_size'])
+            test_loaders[eval_cells_dict[cell]] = test_loader
 
     if args.load:
         print("loading saved model...")
-        model.load_state_dict(torch.load('./model.pt'))
+        for cell in train_cells:
+            models[train_cells_dict[cell]].load_state_dict(torch.load('./model' + cell + '.pt'))
     if args.train:
-        print("running training loop...")
-        train(model, train_loader)
-        validate(model, validate_loader)
-    if args.test:
-        print("running testing loop...")
-        test(model, test_loader)
+        for i, cell in enumerate(train_cells):
+            print("running training loop", i, "out of", len(train_cells), "for", cell)
+            model = models[train_cells_dict[cell]].to(device)
+            train(model, train_loaders[train_cells_dict[cell]])
+            validate(model, validate_loaders[train_cells_dict[cell]])
     if args.save:
         print("saving model...")
-        torch.save(model.state_dict(), './model.pt')
+        for cell in train_cells:
+            torch.save(models[train_cells_dict[cell]].state_dict(), './model'+ cell + '.pt')
+    if args.test:
+        print("running testing loop...")
+        test(models, test_loaders)
