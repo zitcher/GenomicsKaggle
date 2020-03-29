@@ -15,7 +15,7 @@ class _DenseLayer(nn.Module):
                                            growth_rate, kernel_size=1, stride=1,
                                            bias=False)),
         self.add_module('norm2', nn.BatchNorm2d(bn_size * growth_rate)),
-        self.add_module('relu2', nn.ELU(inplace=True)),
+        self.add_module('relu2', nn.ReLU(inplace=True)),
         self.add_module('conv2', nn.Conv2d(bn_size * growth_rate, growth_rate,
                                            kernel_size=3, stride=1, padding=1,
                                            bias=False)),
@@ -103,7 +103,7 @@ class DenseNet(nn.Module):
             ('conv0', nn.Conv2d(1, num_init_features, kernel_size=3, stride=1,
                                 padding=1, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
-            ('relu0', nn.ELU(inplace=True)),
+            ('relu0', nn.ReLU(inplace=True)),
             ('pool0', nn.MaxPool2d(kernel_size=3, stride=1, padding=1)),
         ]))
 
@@ -160,4 +160,4 @@ def densenet(**kwargs):
     r"""Densenet-121 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
     """
-    return _densenet('densenet', 2, (3, 6, 6, 3), 16, **kwargs)
+    return _densenet('densenet', 4, (4, 8, 16, 8), 16, **kwargs)

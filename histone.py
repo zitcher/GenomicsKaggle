@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hyperparams = {
     "num_epochs": 1,
-    "batch_size": 40,
+    "batch_size": 50,
     "learning_rate": 0.001,
 }
 
@@ -25,14 +25,15 @@ def train(model, train_loader):
     optimizer = optim.Adam(model.parameters(), hyperparams['learning_rate'])
 
     model = model.train()
+    losses = []
     for epoch in range(hyperparams['num_epochs']):
         for batch in tqdm(train_loader):
             x = batch['x']
             y = batch['y']
             x = x.unsqueeze(1)
+            x = torch.cat((x, x, x), 2)
             x = x.to(device)
             y = y.to(device)
-            # x = torch.cat((x, x), 2)
 
             optimizer.zero_grad()
             y_pred = model(x)
@@ -42,8 +43,10 @@ def train(model, train_loader):
             loss.backward()  # calculate gradients
             optimizer.step()  # update model weights
 
+            losses.insert(0, loss.item())
+            losses = losses[:100]
             print("loss:", loss.item())
-
+            print("avg loss:", np.mean(losses))
 
 def validate(model, validate_loader):
     print("starting validation")
@@ -56,9 +59,9 @@ def validate(model, validate_loader):
         x = batch['x']
         y = batch['y']
         x = x.unsqueeze(1)
+        x = torch.cat((x, x, x), 2)
         x = x.to(device)
         y = y.to(device)
-        # x = torch.cat((x, x), 2)
 
         y_pred = model(x)
 
@@ -79,8 +82,8 @@ def test(model, test_loader):
         cell_type = batch['cell_type']
         id = batch['id']
         x = x.unsqueeze(1)
+        x = torch.cat((x, x, x), 2)
         x = x.to(device)
-        # x = torch.cat((x, x), 2)
 
         y_pred = model(x)
         for i in range(y_pred.size()[0]):
@@ -90,9 +93,9 @@ def test(model, test_loader):
     df = pd.DataFrame(classification, columns=['id', 'expression'])
     df.to_csv('submission.csv', index=False)
 
-# python histone.py -s -S ./data -T data/train.npz -t data/eval.npz
-# python histone.py -s -L ./data -T data/train.npz -t data/eval.npz
-# python histone.py -lL ./data -t data/eval.npz
+# python histone.py -s -T data/train.npz -t data/eval.npz
+# python histone.py -l -T data/train.npz -t data/eval.npz
+# python histone.py -l ./data -t data/eval.npz
 # mv model.py
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
