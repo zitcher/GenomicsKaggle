@@ -14,7 +14,7 @@ class DenseLayer(nn.Module):
         self.norm2 = nn.BatchNorm2d(bn_size * growth_rate)
         self.relu2 = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(bn_size * growth_rate, growth_rate, kernel_size=3, stride=1, padding=1, bias=False)
-        self.drop_rate = float(drop_rate)
+        self.droput = nn.Dropout(p=drop_rate)
 
     def bn_function(self, inputs):
         # type: (List[Tensor]) -> Tensor
@@ -32,8 +32,7 @@ class DenseLayer(nn.Module):
 
         new_features = self.conv2(self.relu2(self.norm2(bottleneck_output)))
         if self.drop_rate > 0:
-            new_features = F.dropout(new_features, p=self.drop_rate,
-                                     training=self.training)
+            new_features = self.dropout(new_features)
         return new_features
 
 

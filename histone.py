@@ -99,10 +99,14 @@ def test(models, test_loaders, cell_types):
         test_loader = test_loaders[cell]
         cell_models = []
         if cell in train_cells:
-            cell_models.append(models[train_cells_dict[cell]].to(device))
+            model = models[train_cells_dict[cell]].to(device)
+            model = model.eval()
+            cell_models.append(model)
         else:
             for cell in train_cells:
-                cell_models.append(models[train_cells_dict[cell]].to(device))
+                model = models[train_cells_dict[cell]].to(device)
+                model = model.eval()
+                cell_models.append(model)
 
         for batch in tqdm(test_loader):
             x = batch['x']
