@@ -5,19 +5,15 @@ from collections import OrderedDict
 from torch import Tensor
 
 
-class _DenseLayer(nn.Module):
+class DenseLayer(nn.Module):
     def __init__(self, num_input_features, growth_rate, bn_size, drop_rate):
-        super(_DenseLayer, self).__init__()
-        self.add_module('norm1', nn.BatchNorm2d(num_input_features)),
-        self.add_module('relu1', nn.ReLU(inplace=True)),
-        self.add_module('conv1', nn.Conv2d(num_input_features, bn_size *
-                                           growth_rate, kernel_size=1, stride=1,
-                                           bias=False)),
-        self.add_module('norm2', nn.BatchNorm2d(bn_size * growth_rate)),
-        self.add_module('relu2', nn.ReLU(inplace=True)),
-        self.add_module('conv2', nn.Conv2d(bn_size * growth_rate, growth_rate,
-                                           kernel_size=3, stride=1, padding=1,
-                                           bias=False)),
+        super(DenseLayer, self).__init__()
+        self.norm1 = nn.BatchNorm2d(num_input_features)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.conv1 = nn.Conv2d(num_input_features, bn_size * growth_rate, kernel_size=1, stride=1, bias=False)
+        self.norm2 = nn.BatchNorm2d(bn_size * growth_rate)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(bn_size * growth_rate, growth_rate, kernel_size=3, stride=1, padding=1, bias=False)
         self.drop_rate = float(drop_rate)
 
     def bn_function(self, inputs):
@@ -41,13 +37,11 @@ class _DenseLayer(nn.Module):
         return new_features
 
 
-class _DenseBlock(nn.ModuleDict):
-    _version = 2
-
+class DenseBlock(nn.ModuleDict):
     def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate):
-        super(_DenseBlock, self).__init__()
+        super(DenseBlock, self).__init__()
         for i in range(num_layers):
-            layer = _DenseLayer(
+            layer = DenseLayer(
                 num_input_features + i * growth_rate,
                 growth_rate=growth_rate,
                 bn_size=bn_size,
@@ -63,32 +57,19 @@ class _DenseBlock(nn.ModuleDict):
         return torch.cat(features, 1)
 
 
-class _Transition(nn.Sequential):
+class Transition(nn.Sequential):
     def __init__(self, num_input_features, num_output_features):
-        super(_Transition, self).__init__()
-        self.add_module('norm', nn.BatchNorm2d(num_input_features))
-        self.add_module('relu', nn.ReLU(inplace=True))
-        self.add_module('conv', nn.Conv2d(num_input_features, num_output_features,
-                                          kernel_size=1, stride=1, bias=False))
+        super(Transition, self).__init__()
+        self.norm = nn.BatchNorm2d(num_input_features)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv = nn.Conv2d(num_input_features, num_output_features, kernel_size=1, stride=1, bias=False)
         # prevent output from shrinking
         # self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=1))
-        self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=(2, 1)))
+        self.pool = nn.AvgPool2d(kernel_size=2, stride=(2, 1))
 
 
 
 class DenseNet(nn.Module):
-    r"""Densenet-BC model class, based on
-        growth_rate (int) - how many filters to add each layer (k in paper)
-        block_config (list of 4 ints) - how many layers in each pooling block
-        num_init_features (int) - the number of filters to learn in the first convolution layer
-        bn_size (int) - multiplicative factor for number of bottle neck layers
-          (i.e. bn_size * k features in the bottleneck layer)
-        drop_rate (float) - dropout rate after each dense layer
-        num_classes (int) - number of classification classes
-    """
-
-    __constants__ = ['features']
-
     def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
                  num_init_features=64, bn_size=4, drop_rate=0.2, num_classes=1, theta=0.5):
 
@@ -106,7 +87,7 @@ class DenseNet(nn.Module):
         # Each denseblock
         num_features = num_init_features
         for i, num_layers in enumerate(block_config):
-            block = _DenseBlock(
+            block = DenseBlock(
                 num_layers=num_layers,
                 num_input_features=num_features,
                 bn_size=bn_size,
@@ -116,7 +97,7 @@ class DenseNet(nn.Module):
             self.features.add_module('denseblock%d' % (i + 1), block)
             num_features = num_features + num_layers * growth_rate
             if i != len(block_config) - 1:
-                trans = _Transition(num_input_features=num_features,
+                trans = Transition(num_input_features=num_features,
                                     num_output_features=int(num_features * theta))
                 self.features.add_module('transition%d' % (i + 1), trans)
                 num_features = int(num_features * theta)
@@ -127,7 +108,6 @@ class DenseNet(nn.Module):
         # Linear layer
         self.classifier = nn.Linear(num_features, num_classes)
 
-        # Official init from torch repo.
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight)
@@ -147,5 +127,7 @@ class DenseNet(nn.Module):
 
 
 def densenet():
+    # I initially attempted to use torchvision's Densenet, but our data matrix is too small.
+    # so I modified their network.
     model = DenseNet(4, (4, 4, 4, 4), 16)
     return model
