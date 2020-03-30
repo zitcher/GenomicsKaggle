@@ -153,4 +153,5 @@ def _densenet(arch, growth_rate, block_config, num_init_features,
 
 
 def densenet(**kwargs):
+    # based on torchvision's implementation of Densenet, but modified to fit out dataset
     return _densenet('densenet', 4, (4, 4, 4, 4), 16, **kwargs)
