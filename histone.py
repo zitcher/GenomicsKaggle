@@ -92,33 +92,42 @@ def validate(model, validate_loader):
     print("mean loss:", np.mean(losses))
 
 
-def test(models, test_loaders):
+def test(models, test_loaders, cell_types):
     print("starting test")
     classification = []
-    for cell in eval_cells:
-        test_loader = test_loaders[train_cells_dict[cell]]
+    for cell in cell_types:
+        test_loader = test_loaders[cell]
         cell_models = []
         if cell in train_cells:
             cell_models.append(models[train_cells_dict[cell]].to(device))
         else:
-            cell_models.extend(models)
+            for cell in train_cells:
+                cell_models.append(models[train_cells_dict[cell]].to(device))
 
         for batch in tqdm(test_loader):
             x = batch['x']
             id = batch['id']
+            cell_type = batch['cell_type']
             x = x.unsqueeze(1)
             x = x.to(device)
 
-            y_preds = []
-            for model in models:
-                y_preds.append(model(x))
+            y_preds = None
+            if len(cell_models) == 1:
+                y_preds = cell_models[0](x).unsqueeze(0)
+            else:
+                for model in cell_models:
+                    if y_preds is None:
+                        y_preds = model(x).unsqueeze(0)
+                    else:
+                        y_preds = torch.cat((y_preds, model(x).unsqueeze(0)))
 
             y_pred = torch.mean(y_preds, 0)
+            # print(y_pred)
 
             for i in range(y_pred.size()[0]):
                 # print(cell_type[i].item(), id[i].item(), y_pred[i].item())
                 classification.append(
-                    (cell + "_" + str(int(id[i].item())), str(y_pred[i].item())))
+                    (cell_type[i].item() + "_" + str(int(id[i].item())), str(y_pred[i].item())))
 
     df = pd.DataFrame(classification, columns=['id', 'expression'])
     df.to_csv('submission.csv', index=False)
@@ -126,7 +135,7 @@ def test(models, test_loaders):
 
 # python histone.py -s -T data/train.npz -t data/eval.npz
 # python histone.py -l -T data/train.npz -t data/eval.npz
-# python histone.py -l ./data -t data/eval.npz
+# python histone.py -l -t data/eval.npz
 # mv model.py
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -163,11 +172,16 @@ if __name__ == "__main__":
             validate_datasets[train_cells_dict[cell]] = validate_dataset
 
 
+    test_file = None
+    cell_types = None
     if args.test:
         test_file = args.test[0]
-        for cell in eval_cells:
+        npzfile = np.load(test_file)
+        cell_types = npzfile.files
+        for cell in cell_types:
+            assert cell in eval_cells_dict
             test_dataset = HistoneDataset(test_file, cell)
-            test_datasets[eval_cells_dict[cell]] = test_dataset
+            test_datasets[cell] = test_dataset
 
     train_loaders = dict()
     validate_loaders = dict()
@@ -185,9 +199,9 @@ if __name__ == "__main__":
 
     test_loaders = dict()
     if args.test:
-        for cell in eval_cells:
-            test_loader = DataLoader(test_datasets[eval_cells_dict[cell]], batch_size=hyperparams['batch_size'])
-            test_loaders[eval_cells_dict[cell]] = test_loader
+        for cell in cell_types:
+            test_loader = DataLoader(test_datasets[cell], batch_size=hyperparams['batch_size'])
+            test_loaders[cell] = test_loader
 
     if args.load:
         print("loading saved model...")
@@ -205,4 +219,4 @@ if __name__ == "__main__":
             torch.save(models[train_cells_dict[cell]].state_dict(), './model'+ cell + '.pt')
     if args.test:
         print("running testing loop...")
-        test(models, test_loaders)
+        test(models, test_loaders, cell_types)

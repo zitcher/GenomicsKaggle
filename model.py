@@ -5,7 +5,6 @@ from collections import OrderedDict
 from torch import Tensor
 
 
-# Based on https://pytorch.org/docs/stable/_modules/torchvision/models/densenet.html
 class _DenseLayer(nn.Module):
     def __init__(self, num_input_features, growth_rate, bn_size, drop_rate):
         super(_DenseLayer, self).__init__()
@@ -24,7 +23,7 @@ class _DenseLayer(nn.Module):
     def bn_function(self, inputs):
         # type: (List[Tensor]) -> Tensor
         concated_features = torch.cat(inputs, 1)
-        bottleneck_output = self.conv1(self.relu1(self.norm1(concated_features)))  # noqa: T484
+        bottleneck_output = self.conv1(self.relu1(self.norm1(concated_features)))
         return bottleneck_output
 
     def forward(self, input):
@@ -71,30 +70,27 @@ class _Transition(nn.Sequential):
         self.add_module('relu', nn.ReLU(inplace=True))
         self.add_module('conv', nn.Conv2d(num_input_features, num_output_features,
                                           kernel_size=1, stride=1, bias=False))
+        # prevent output from shrinking
         # self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=1))
-        self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=1))
+        self.add_module('pool', nn.AvgPool2d(kernel_size=2, stride=(2, 1)))
 
-# 3.49
+
+
 class DenseNet(nn.Module):
     r"""Densenet-BC model class, based on
-    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
-
-    Args:
-        growth_rate (int) - how many filters to add each layer (`k` in paper)
+        growth_rate (int) - how many filters to add each layer (k in paper)
         block_config (list of 4 ints) - how many layers in each pooling block
         num_init_features (int) - the number of filters to learn in the first convolution layer
         bn_size (int) - multiplicative factor for number of bottle neck layers
           (i.e. bn_size * k features in the bottleneck layer)
         drop_rate (float) - dropout rate after each dense layer
         num_classes (int) - number of classification classes
-        memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
-          but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_
     """
 
     __constants__ = ['features']
 
     def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
-                 num_init_features=64, bn_size=4, drop_rate=0.2, num_classes=1):
+                 num_init_features=64, bn_size=4, drop_rate=0.2, num_classes=1, theta=0.5):
 
         super(DenseNet, self).__init__()
 
@@ -121,9 +117,9 @@ class DenseNet(nn.Module):
             num_features = num_features + num_layers * growth_rate
             if i != len(block_config) - 1:
                 trans = _Transition(num_input_features=num_features,
-                                    num_output_features=num_features // 2)
+                                    num_output_features=int(num_features * theta))
                 self.features.add_module('transition%d' % (i + 1), trans)
-                num_features = num_features // 2
+                num_features = int(num_features * theta)
 
         # Final batch norm
         self.features.add_module('norm5', nn.BatchNorm2d(num_features))
@@ -157,7 +153,4 @@ def _densenet(arch, growth_rate, block_config, num_init_features,
 
 
 def densenet(**kwargs):
-    r"""Densenet-121 model from
-    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
-    """
-    return _densenet('densenet', 2, (2, 4, 4, 4), 16, **kwargs)
+    return _densenet('densenet', 4, (4, 4, 4, 4), 16, **kwargs)
