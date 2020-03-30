@@ -31,8 +31,7 @@ class DenseLayer(nn.Module):
         bottleneck_output = self.bn_function(prev_features)
 
         new_features = self.conv2(self.relu2(self.norm2(bottleneck_output)))
-        if self.drop_rate > 0:
-            new_features = self.dropout(new_features)
+        new_features = self.dropout(new_features)
         return new_features
 
 
