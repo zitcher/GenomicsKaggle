@@ -75,11 +75,11 @@ class DenseNet(nn.Module):
 
         # First convolution
         self.features = nn.Sequential(OrderedDict([
-            ('conv0', nn.Conv2d(1, num_init_features, kernel_size=7, stride=1,
+            ('conv0', nn.Conv2d(1, num_init_features, kernel_size=7, stride=(2, 1),
                                 padding=3, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
             ('relu0', nn.ReLU(inplace=True)),
-            ('pool0', nn.MaxPool2d(kernel_size=3, stride=1, padding=1)),
+            ('pool0', nn.MaxPool2d(kernel_size=3, stride=(2, 1), padding=1)),
         ]))
 
         # Each denseblock
@@ -127,5 +127,5 @@ class DenseNet(nn.Module):
 def densenet():
     # I initially attempted to use torchvision's Densenet, but our data matrix is too small.
     # so I modified their network.
-    model = DenseNet(4, (4, 4, 4, 4), 16)
+    model = DenseNet(4, (3, 3, 3, 3), 16)
     return model

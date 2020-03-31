@@ -14,8 +14,8 @@ from preprocess import HistoneDataset
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hyperparams = {
-    "num_epochs": 2,
-    "batch_size": 20,
+    "num_epochs": 20,
+    "batch_size": 100,
     "learning_rate": 0.001,
 }
 
