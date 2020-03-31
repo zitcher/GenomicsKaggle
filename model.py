@@ -125,7 +125,6 @@ class DenseNet(nn.Module):
 
 
 def densenet():
-    # I initially attempted to use torchvision's Densenet, but our data matrix is too small.
-    # so I modified their network.
+    # based on tochvision
     model = DenseNet(4, (3, 3, 3, 3), 16)
     return model
