@@ -37,7 +37,7 @@ eval_cells = ['E065', 'E004', 'E066', 'E005', 'E012', 'E027', 'E053', 'E013', 'E
 eval_cells_dict = cells_to_id(eval_cells)
 
 
-def train(model, train_loader):
+def train(model, train_loader, cellType=None):
     print("starting train")
 
     loss_fn = torch.nn.MSELoss(
@@ -46,8 +46,9 @@ def train(model, train_loader):
 
     model = model.train()
     losses = []
+    data_process = []
     for epoch in range(hyperparams['num_epochs']):
-        for batch in tqdm(train_loader):
+        for batch_num, batch in enumerate(tqdm(train_loader)):
             x = batch['x']
             y = batch['y']
             x = x.unsqueeze(1)
@@ -65,7 +66,9 @@ def train(model, train_loader):
             losses.insert(0, loss.item())
             losses = losses[:100]
             print("loss:", loss.item())
-            print("avg loss:", np.mean(losses))
+            # print("avg loss:", np.mean(losses))
+            data_process.append((epoch + 1, batch_num + 1, loss.item(), np.mean(losses), cellType))
+    return data_process
 
 
 def validate(model, validate_loader):
@@ -91,6 +94,7 @@ def validate(model, validate_loader):
 
     print("mean loss:", np.mean(losses))
 
+    return np.mean(losses)
 
 def test(models, test_loaders, cell_types):
     print("starting test")
@@ -212,11 +216,21 @@ if __name__ == "__main__":
         for cell in train_cells:
             models[train_cells_dict[cell]].load_state_dict(torch.load('./model' + cell + '.pt'))
     if args.train:
+        validation_scores = []
         for i, cell in enumerate(train_cells):
             print("running training loop", i, "out of", len(train_cells), "for", cell)
             model = models[train_cells_dict[cell]].to(device)
-            train(model, train_loaders[train_cells_dict[cell]])
-            validate(model, validate_loaders[train_cells_dict[cell]])
+            resulting_data = train(model, train_loaders[train_cells_dict[cell]], cell)
+
+            validate_score = validate(model, validate_loaders[train_cells_dict[cell]])
+            validation_scores.append((validate_score, cell))
+
+            resulting_data.append((9999, 9999, validate_score, validate_score, cell))
+            df = pd.DataFrame(resulting_data, columns=['epoch', 'batch number', 'loss', 'avg loss', 'cell type'])
+            df.to_csv('./data_analysis/data_' + cell + '.csv')
+
+        df2 = pd.DataFrame(validation_scores, columns=['mse', 'cell type'])
+        df2.to_csv('./data_analysis/validation_scores.csv')
     if args.save:
         print("saving model...")
         for cell in train_cells:
