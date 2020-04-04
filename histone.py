@@ -2,6 +2,7 @@ import argparse
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
@@ -14,7 +15,7 @@ from preprocess import HistoneDataset
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hyperparams = {
-    "num_epochs": 20,
+    "num_epochs": 1,
     "batch_size": 100,
     "learning_rate": 0.001,
 }
@@ -47,8 +48,8 @@ def train(model, train_loader, cellType=None):
     model = model.train()
     losses = []
     data_process = []
-    for epoch in range(hyperparams['num_epochs']):
-        for batch_num, batch in enumerate(tqdm(train_loader)):
+    for epoch in tqdm(range(hyperparams['num_epochs'])):
+        for batch_num, batch in enumerate(train_loader):
             x = batch['x']
             y = batch['y']
             x = x.unsqueeze(1)
@@ -65,7 +66,7 @@ def train(model, train_loader, cellType=None):
 
             losses.insert(0, loss.item())
             losses = losses[:100]
-            print("loss:", loss.item())
+            #print("loss:", loss.item())
             # print("avg loss:", np.mean(losses))
             data_process.append((epoch + 1, batch_num + 1, loss.item(), np.mean(losses), cellType))
     return data_process
@@ -79,19 +80,35 @@ def validate(model, validate_loader):
     model = model.eval()
     losses = []
 
-    for batch in tqdm(validate_loader):
+    grad_data_total = torch.zeros([5, 100], dtype=torch.float32)
+    num_batches = 0 
+
+    for batch in validate_loader:
         x = batch['x']
         y = batch['y']
         x = x.unsqueeze(1)
         x = x.to(device)
         y = y.to(device)
 
+        x.requires_grad_()
         y_pred = model(x)
+
+        y_pred.squeeze(1).sum().backward()
+
+        grad_data = x.grad.data.abs()
+        grad_data_avg = torch.mean(grad_data,0).squeeze().transpose(1, 0)
+        grad_data_total = grad_data_total + grad_data_avg
+        num_batches = num_batches + 1
 
         loss = loss_fn(y_pred.squeeze(1), y)
 
         losses.append(loss.item())
 
+    grad_data_total_avg = grad_data_total / num_batches
+    plt.imshow(grad_data_total_avg, cmap=plt.cm.hot)
+    plt.show()
+
+    print('grad_data_avg size: {}'.format(grad_data_total_avg.size()))
     print("mean loss:", np.mean(losses))
 
     return np.mean(losses)
@@ -112,7 +129,7 @@ def test(models, test_loaders, cell_types):
                 model = model.eval()
                 cell_models.append(model)
 
-        for batch in tqdm(test_loader):
+        for batch in test_loader:
             x = batch['x']
             id = batch['id']
             cell_type = batch['cell_type']
