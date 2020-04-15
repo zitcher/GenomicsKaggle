@@ -79,6 +79,7 @@ def validate(model, validate_loader):
     for batch in tqdm(validate_loader):
         x = batch['x']
         y = batch['y']
+        # unsqueeze to create 1 input channel
         x = x.unsqueeze(1)
         x = x.to(device)
         y = y.to(device)
@@ -220,7 +221,7 @@ if __name__ == "__main__":
     if args.save:
         print("saving model...")
         for cell in train_cells:
-            torch.save(models[train_cells_dict[cell]].state_dict(), './model'+ cell + '.pt')
+            torch.save(models[train_cells_dict[cell]].state_dict(), './model' + cell + '.pt')
     if args.test:
         print("running testing loop...")
         test(models, test_loaders, cell_types)

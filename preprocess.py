@@ -96,15 +96,10 @@ class HistoneDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-        getitem should return a tuple or dictionary of the data at some index
-        In this case, you should return your original and target sentence and
-        anything else you may need in training/validation/testing.
-
         :param idx: the index for retrieval
 
         :return: tuple or dictionary of the data
         """
-        # TODO: Override method to return the items in dataset
         item = {
             "cell_type": self.type[idx],
             "id": self.id[idx],
@@ -115,7 +110,6 @@ class HistoneDataset(Dataset):
 
 
 if __name__ == '__main__':
-
     pp = pprint.PrettyPrinter(indent=4)
     parser = argparse.ArgumentParser()
     parser.add_argument('input_file', help='input dataset')
