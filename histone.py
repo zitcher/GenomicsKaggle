@@ -1,8 +1,7 @@
 from preprocess import HistoneDataset
 from model import densenet
 from torch.utils.data import DataLoader, random_split
-from torch import nn, optim
-from torch.nn import functional as F
+from torch import optim
 import torch
 import numpy as np
 import argparse
@@ -12,9 +11,9 @@ import pandas as pd
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hyperparams = {
-    "num_epochs": 2,
-    "batch_size": 50,
-    "learning_rate": 0.0001,
+    "num_epochs": 50,
+    "batch_size": 128,
+    "learning_rate": 1e-3,
 }
 
 
@@ -25,8 +24,10 @@ def train(model, train_loader):
     optimizer = optim.Adam(model.parameters(), hyperparams['learning_rate'])
 
     model = model.train()
-    losses = []
+
     for epoch in range(hyperparams['num_epochs']):
+        losses = []
+        print(epoch)
         for batch in tqdm(train_loader):
             x = batch['x']
             y = batch['y']
@@ -44,8 +45,8 @@ def train(model, train_loader):
 
             losses.insert(0, loss.item())
             losses = losses[:100]
-            print("loss:", loss.item())
-            print("avg loss:", np.mean(losses))
+        print("epoch loss:", np.mean(losses))
+
 
 def validate(model, validate_loader):
     print("starting validation")
@@ -67,6 +68,7 @@ def validate(model, validate_loader):
 
         losses.append(loss.item())
 
+    torch.save(model.state_dict(), './model.pt')
     print("mean loss:", np.mean(losses))
 
 
@@ -90,6 +92,7 @@ def test(model, test_loader):
     df = pd.DataFrame(classification, columns=['id', 'expression'])
     df.to_csv('submission.csv', index=False)
 
+# nohup python histone.py -s -T data/train.npz -t data/eval.npz &
 # python histone.py -s -T data/train.npz -t data/eval.npz
 # python histone.py -l -T data/train.npz -t data/eval.npz
 # python histone.py -l ./data -t data/eval.npz
@@ -105,28 +108,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("Device", device)
+    seq_file = 'data/seq_data.csv'
 
     model = densenet().to(device)
-    train_dataset = None
-    validate_dataset = None
-    test_dataset = None
-
+    print("gathering train data")
+    train_loader = None
     if args.train:
         train_file = args.train[0]
-        dataset = HistoneDataset(train_file)
+        dataset = HistoneDataset(train_file, seq_file)
 
         split_amount = int(len(dataset) * 0.9)
 
         train_dataset, validate_dataset = random_split(
             dataset, (split_amount, len(dataset) - split_amount))
 
-    if args.test:
-        test_file = args.test[0]
-
-        test_dataset = HistoneDataset(test_file)
-
-    train_loader = None
-    if args.train:
         train_loader = DataLoader(
             train_dataset, batch_size=hyperparams['batch_size'], shuffle=True
         )
@@ -134,13 +129,16 @@ if __name__ == "__main__":
             validate_dataset, batch_size=hyperparams['batch_size'], shuffle=True
         )
 
+    print("gathering test data")
     test_loader = None
     if args.test:
+        test_file = args.test[0]
+        test_dataset = HistoneDataset(test_file, seq_file)
         test_loader = DataLoader(test_dataset, batch_size=hyperparams['batch_size'])
 
     if args.load:
         print("loading saved model...")
-        model.load_state_dict(torch.load('./model.pt'))
+        model.load_state_dict(torch.load('./model.pt', map_location=torch.device(device)))
     if args.train:
         print("running training loop...")
         train(model, train_loader)

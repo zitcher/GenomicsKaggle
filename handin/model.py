@@ -99,10 +99,7 @@ class DenseNet(nn.Module):
                 self.features.add_module('transition%d' % (i + 1), trans)
                 num_features = int(num_features * theta)
 
-        # Final batch norm
         self.features.add_module('norm5', nn.BatchNorm2d(num_features))
-
-        # Linear layer
         self.classifier = nn.Linear(num_features, num_classes)
 
         for m in self.modules():
@@ -124,6 +121,6 @@ class DenseNet(nn.Module):
 
 
 def densenet():
-    # based on tochvision
+    # variant of the tochvision model
     model = DenseNet(4, (3, 3, 3, 3), 16)
     return model
