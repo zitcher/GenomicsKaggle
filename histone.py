@@ -11,7 +11,7 @@ import pandas as pd
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 hyperparams = {
-    "num_epochs": 50,
+    "num_epochs": 15,
     "batch_size": 128,
     "learning_rate": 1e-3,
 }
