@@ -14,3 +14,5 @@ data/
 *.pt
 *.csv
 *.log
+*.npz
+*.npy
