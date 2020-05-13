@@ -1,25 +1,5 @@
-# DLGenomicsKaggle
-CS1850
+# Instructions
 
-# Objective
-Predict gene expression based on histone modification
+`DLGenomicFinal.ipynb` is a jupyter notebook file and should be opened and run as such (use the `jupyter notebook` command, load into google colab, etc). The file contains inline comments describing what each block of code does.
 
-# Papers to Read
-Deepchrome: https://academic.oup.com/bioinformatics/article/32/17/i639/2450757
-
-Deephistone: https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-019-5489-4
-
-# Potential Model
-
-https://arxiv.org/abs/1808.03867
-
-# Contains List of Famous Models You can Reference for Architecture
-
-https://arxiv.org/pdf/1901.06032.pdf
-
-# Preprocess
-`python preprocess.py data/train.npz`
-`python preprocess.py data/eval.npz`
-
-# Train and Test
-`python histone.py -s -T data/train.npz -t data/eval.npz`
+The "Running the Model" section off the notebook describes the different settings for running the model.
