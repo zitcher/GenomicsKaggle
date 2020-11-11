@@ -1,6 +1,4 @@
 # DLGenomicsKaggle
-CS1850
-
 # Objective
 Predict gene expression based on histone modification
 
